@@ -14,8 +14,6 @@ SECRET_KEY = 'django-insecure-d9^uzh7kmvthdxlrey+qda2)pef-f%&v8bma^no++x8v32e=_j
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
 WEBSITE_URL = 'http://127.0.0.1:8000'
 
 # REST_FRAMEWORK = {
@@ -112,18 +110,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'ilearn_backend.wsgi.application'
-
-
-# Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
