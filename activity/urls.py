@@ -2,7 +2,11 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('get_active_courses/', views.get_active_courses),
+    path('get_active_courses/', views.get_active_courses), #
+    path('get_my_registered_courses/', views.get_my_registered_courses),
+    path('get_my_created_courses/', views.get_my_created_courses),
+    path('get_my_unpublished_courses/', views.get_my_unpublished_courses),
+    path('get_my_completed_courses/', views.get_my_completed_courses),
     path('create_course_enrollment/', views.create_enrollment),
     path('get_enrolled_courses/', views.get_enrolled_courses),
     path('verify_enrolled_course/<slug:course_slug>/', views.get_my_enrolled_course),

@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import timedelta
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -14,7 +15,7 @@ SECRET_KEY = 'django-insecure-d9^uzh7kmvthdxlrey+qda2)pef-f%&v8bma^no++x8v32e=_j
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-WEBSITE_URL = 'http://127.0.0.1:8000'
+
 
 # REST_FRAMEWORK = {
 #     'DATETIME_FORMAT': '%d.%m.%Y %H:%M',
@@ -38,8 +39,10 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=90),
+    # 'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
+    # 'REFRESH_TOKEN_LIFETIME': timedelta(days=90),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',
@@ -69,6 +72,8 @@ INSTALLED_APPS = [
     'authentication',
     'course',
     'activity',
+    'stats',
+    'notifications',
     
     
 ]
@@ -96,7 +101,7 @@ ROOT_URLCONF = 'ilearn_backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -137,20 +142,26 @@ LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'UTC'
 
-USE_I18N = True
+USE_I18N = os.path.join(BASE_DIR, "../") + 'static/'
 
 USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
-
+STATIC_ROOT = os.path.join(BASE_DIR, "../") + 'static/'
 STATIC_URL = 'static/'
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, "../") +  'media/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'authentication.user'
+
+# Maximum size (in bytes) of request data
+DATA_UPLOAD_MAX_MEMORY_SIZE = 1048576000  # 1 GB
+
+# File upload settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 1048576000  # 1 GB

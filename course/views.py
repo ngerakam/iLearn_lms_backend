@@ -10,6 +10,7 @@ from rest_framework import status
 
 from .models import Course, Lesson, Comment, Category, Quiz
 from .serializers import (CourseListSerializer, CourseDetailSerializer,
+                          CourseDetailStatusSerializer,
                            LessonListSerializer , CommentSerializer,
                              CategorySerializer, QuizSerializer,
                              UserSerializer)
@@ -65,6 +66,36 @@ def create_course(request):
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(['PUT'])
+def update_course(request, slug):
+    try:
+        course = Course.objects.get(slug=slug, created_by=request.user)
+        
+        course.title = request.data.get('title', course.title)
+        course.short_description = request.data.get('short_description', course.short_description)
+        course.long_description = request.data.get('long_description', course.long_description)
+        course.status = request.data.get('status', course.status)
+        
+        # Update categories
+        category_ids = request.data.getlist('categories[]')
+        if category_ids:
+            categories = Category.objects.filter(id__in=category_ids)
+            course.categories.set(categories)
+        
+        # Update image if provided
+        image_file = request.data.get('image')
+        if image_file:
+            course.image.save(image_file.name, image_file)
+        
+        course.save()
+
+        serializer = CourseListSerializer(course, many=False)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    except Course.DoesNotExist:
+        return Response({'error': 'Course not found or you do not have permission to edit this course.'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @authentication_classes([])
@@ -118,6 +149,30 @@ def get_course(request, slug):
     else:
         course_data = {}
         lesson_data = lesson_serializer.data
+
+    data = {
+        'course' : course_data,
+        'lessons' : lesson_data
+    }
+
+    return Response(data)
+
+@api_view(['GET'])
+# @authentication_classes([])
+# @permission_classes([])
+def get_course_with_status(request, slug):
+    course = Course.objects.get(slug=slug)
+    course_serializer = CourseDetailStatusSerializer(course)
+    lesson_serializer = LessonListSerializer(course.lessons.all(), many=True)
+
+    if request.user.is_authenticated:
+        course_data = course_serializer.data
+        lesson_data = lesson_serializer.data
+
+    else:
+        course_data = {}
+        lesson_data = lesson_serializer.data
+
 
     data = {
         'course' : course_data,
@@ -201,6 +256,17 @@ def get_author_courses(request, user_id):
             'created_by': user_serializer.data
          })
 
+@api_view(['GET'])
+def get_user_lesson(request,course_slug,lesson_slug):
+    user = request.user
+    lesson = Lesson.objects.get(slug=lesson_slug,
+                                 course__slug=course_slug,
+                                   course__created_by=user)
+
+    serializer = LessonListSerializer(lesson, many=False)
+
+    return Response(serializer.data)
+
 @api_view(['POST'])
 def add_lessons_to_course(request, course_slug):
     user = request.user
@@ -282,15 +348,15 @@ def add_lessons_to_course(request, course_slug):
     else:
         return Response({'error': 'Invalid lesson type.'}, status=status.HTTP_400_BAD_REQUEST)
 
-
-@api_view(['POST'])
-def update_lessons_to_course(request, course_slug):
+@api_view(['PUT'])
+def update_lessons_to_course(request, course_slug, lesson_slug):
     user = request.user
     
     try:
         course = Course.objects.get(slug=course_slug, created_by=user)
-    except Course.DoesNotExist:
-        return Response({'error': 'Course not found or you do not have permission to add lessons to this course.'}, status=status.HTTP_404_NOT_FOUND)
+        lesson = Lesson.objects.get(slug=lesson_slug, course=course)
+    except (Course.DoesNotExist, Lesson.DoesNotExist):
+        return Response({'error': 'Lesson not found or you do not have permission to edit this lesson.'}, status=status.HTTP_404_NOT_FOUND)
 
     lesson_type = request.data.get('lesson_type')
 
@@ -307,44 +373,38 @@ def update_lessons_to_course(request, course_slug):
         return quiz_data
 
     if lesson_type in ['article', 'video', 'file', 'quiz']:
-        lesson_data = {
-            'course': course,
-            'title': request.data.get('title'),
-            'short_description': request.data.get('short_description'),
-            'status': request.data.get('status'),
-        }
+        lesson.title = request.data.get('title', lesson.title)
+        lesson.short_description = request.data.get('short_description', lesson.short_description)
+        lesson.status = request.data.get('status', lesson.status)
+        lesson.lesson_type = lesson_type
 
         if lesson_type == 'article':
-            lesson_data['lesson_type'] = 'article'
-            lesson_data['long_description'] = request.data.get('long_description')
+            lesson.long_description = request.data.get('long_description', lesson.long_description)
         elif lesson_type == 'video':
-            lesson_data['lesson_type'] = 'video'
             video_file = request.data.get('video')
             if video_file:
-                lesson_data['video'] = video_file
+                lesson.video = video_file
+                lesson.youtube_id = None  # Clear youtube_id if video file is provided
             else:
-                lesson_data['youtube_id'] = request.data.get('youtube_id')
+                lesson.youtube_id = request.data.get('youtube_id', lesson.youtube_id)
         elif lesson_type == 'file':
-            lesson_data['lesson_type'] = 'file'
             document_file = request.data.get('document')
             if document_file:
-                lesson_data['file'] = document_file
+                lesson.file = document_file
         elif lesson_type == 'quiz':
-            lesson_data['lesson_type'] = 'quiz'
-            
             quiz_data = extract_quiz_data(request.data)
 
-            lesson = Lesson.objects.create(**lesson_data)
+            # Clear existing quizzes for the lesson
+            Quiz.objects.filter(lesson=lesson).delete()
 
             for index, data in quiz_data.items():
-                question = data.get('question', None)
-                op1 = data.get('op1', None)
-                op2 = data.get('op2', None)
-                op3 = data.get('op3', None)
-                answer = data.get('answer', None)
+                question = data.get('question')
+                op1 = data.get('op1')
+                op2 = data.get('op2')
+                op3 = data.get('op3')
+                answer = data.get('answer')
 
-                # Create the Quiz object without using defaults
-                quiz = Quiz.objects.create(
+                Quiz.objects.create(
                     lesson=lesson,
                     question=question,
                     op1=op1,
@@ -353,14 +413,9 @@ def update_lessons_to_course(request, course_slug):
                     answer=answer
                 )
 
-            serializer = LessonListSerializer(lesson, many=False)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response({'error': 'Invalid lesson type.'}, status=status.HTTP_400_BAD_REQUEST)
+        lesson.save()
 
-        lesson = Lesson.objects.create(**lesson_data)
         serializer = LessonListSerializer(lesson, many=False)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     else:
         return Response({'error': 'Invalid lesson type.'}, status=status.HTTP_400_BAD_REQUEST)
-

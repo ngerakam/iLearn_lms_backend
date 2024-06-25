@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Course Creation Email</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css"
+    />
+  </head>
+  <body>
+    <p>Hello {{ user.first_name }} {{ user.last_name }},</p>
+    <p>You have successfully created a course: {{ course.title }}.</p>
+    <p>Share your knowledge with the world!</p>
+    <p>Best regards,</p>
+    <p>
+      Access your course here:
+      <br />
+      <a class="button is-primary" href="{{ url }}/courses/{{course.slug}}"
+        >Start Learning!</a
+      >
+    </p>
+    <p>
+      Your's faithfully <br />
+      Platform Team @ {{contacts.site.title}} <br />
+      {{contacts.phone_contact}} <br />
+      {{contacts.location_address}} <br />
+    </p>
+  </body>
+</html>

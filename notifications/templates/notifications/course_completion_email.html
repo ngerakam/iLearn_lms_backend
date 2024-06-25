@@ -1,0 +1,29 @@
+<!-- templates/notifications/completion/course_completion_email.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Course Completion Email</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css"
+    />
+  </head>
+  <body>
+    <p>Hello {{ user.first_name }} {{ user.last_name }},</p>
+    <p>
+      Congratulations! You have successfully completed the course
+      {{course.title}}.
+    </p>
+    <p>We hope you found it valuable.</p>
+    <p>Best regards,</p>
+    <p>
+      Your's faithfully <br />
+      Platform Team @ {{contacts.site.title}} <br />
+      {{contacts.phone_contact}} <br />
+      {{contacts.location_address}} <br />
+    </p>
+  </body>
+</html>

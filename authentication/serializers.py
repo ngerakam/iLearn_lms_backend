@@ -22,4 +22,27 @@ class ProfileUserSerializer(serializers.ModelSerializer):
     user = UserSerializer()
     class Meta:
         model = UserProfile
-        fields  = ['user', 'sub_county', 'id_number', 'phone_number', 'gender', 'age']
+        fields  = ['user',  'gender', 'about_me', 'get_profile_image']
+
+
+class SiteAboutSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SiteAbout
+        fields = ['about_message']
+
+class SiteAddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SiteAddress
+        fields = ['email_contact', 'phone_contact', 'location_address']
+
+class SiteSetupSerializer(serializers.ModelSerializer):
+    abouts = SiteAboutSerializer()
+    addresses = SiteAddressSerializer()
+
+    class Meta:
+        model = SiteSetup
+        fields = [
+            'title', 'card1_name', 'card1', 'card2_name', 'card2',
+            'card3_name', 'card3', 'hero_name', 'hero_message',
+            'get_site_image', 'abouts', 'addresses'
+        ]

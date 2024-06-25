@@ -20,12 +20,24 @@ class CourseListSerializer(serializers.ModelSerializer):
         model = Course
         fields = ('id', 'title', 'slug', 'short_description','get_image')
 
+class CourseListStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Course
+        fields = ('id', 'title', 'slug', 'short_description','get_image', 'status',)
+
 
 class CourseDetailSerializer(serializers.ModelSerializer):
     created_by = UserSerializer(many=False)
     class Meta:
         model = Course
         fields = ('id', 'title', 'slug',  'short_description','long_description', 'created_by')
+
+class CourseDetailStatusSerializer(serializers.ModelSerializer):
+    created_by = UserSerializer(many=False)
+    categories = CategorySerializer(many=True)
+    class Meta:
+        model = Course
+        fields = ('id', 'title', 'slug',  'short_description','long_description', 'created_by', 'status', 'categories')
 
 class LessonListSerializer(serializers.ModelSerializer):
     class Meta:

@@ -40,6 +40,9 @@ class CourseStatus(models.Model):
     created_by = models.ForeignKey(User, related_name='course_statuses', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"Course: {self.course}, User: {self.created_by}, Status: {self.status}"
+
 class ScoreBoard(models.Model):
     course = models.ForeignKey(Course, related_name='scores', on_delete=models.CASCADE)
     lesson = models.ForeignKey(Lesson, related_name='scores', on_delete=models.CASCADE)

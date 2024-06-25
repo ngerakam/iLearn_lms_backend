@@ -1,5 +1,6 @@
 from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
 
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
@@ -9,7 +10,7 @@ from .models import Activity, Enrollment, ScoreBoard, CourseStatus
 from .serializers import ActivitySerializer, EnrollmentSerializer, CourseStatusSerializer
 
 from course.models import Course, Lesson, Quiz
-from course.serializers import CourseListSerializer
+from course.serializers import CourseListSerializer,CourseListStatusSerializer
 
 @api_view(['GET'])
 def get_active_courses(request):
@@ -27,13 +28,18 @@ def get_active_courses(request):
 def course_track_started(request, course_slug):
     course = Course.objects.get(slug=course_slug)
 
-    if CourseStatus.objects.filter(created_by=request.user,
-                                course=course).count() == 0:
-        CourseStatus.objects.create(created_by=request.user,
-                                course=course)
+    if CourseStatus.objects.filter(course=course
+                                   ,created_by=request.user
+                                ).count() == 0:
+        CourseStatus.objects.create(course=course,
+                                    created_by=request.user
+                                )
         
-    course_status =CourseStatus.objects.get(created_by=request.user,
-                                course=course)
+    course_status =CourseStatus.objects.get(course=course,
+                                            created_by=request.user,
+                                )
+    
+    print(course_status)
     
     serializer = CourseStatusSerializer(course_status)
 
@@ -43,10 +49,13 @@ def course_track_started(request, course_slug):
 def mark_course_done(request, course_slug):
     course = Course.objects.get(slug=course_slug)
 
-    course_status =CourseStatus.objects.get(created_by=request.user,
-                                course=course)
+    course_status =CourseStatus.objects.get(
+                                course=course,
+                                created_by=request.user
+                                )
     course_status.status = CourseStatus.DONE
     course_status.save()
+    print(course_status)
 
     serializer = CourseStatusSerializer(course_status)
 
@@ -55,39 +64,31 @@ def mark_course_done(request, course_slug):
 @api_view(['GET'])
 def get_my_started_course(request, course_slug):
     try:
-        # Retrieve the course
         course = Course.objects.get(slug=course_slug)
+        course_status = CourseStatus.objects.get(created_by_id=request.user.id, course=course)
 
-        # Check if the user has started the course
-        course_status = CourseStatus.objects.get(created_by=request.user, course=course)
+        if has_incomplete_activities(course, request.user):
+            course_status.status = CourseStatus.DONE
+            course_status.save()
 
-        incomplete_activities = Activity.objects.filter(
-            course=course, created_by=request.user).exclude(
-                status=Activity.STARTED).exists()
-        
-        if incomplete_activities:
-            course_status.status = CourseStatus.STARTED
-
-        course_status.save()
-
-        # If the user has started the course, serialize the course status
-        serializer = CourseStatusSerializer(course_status, many=False)
-
-        data = {
+        serializer = CourseStatusSerializer(course_status)
+        return Response({
             "course_status": serializer.data,
             "message": "You have started this course",
-            "status": status.HTTP_200_OK
-        }
-        return Response(data)
+        }, status=status.HTTP_200_OK)
 
-    except ObjectDoesNotExist as e:
-        # If the course or course status does not exist, return a 404 error
-        data = {
+    except Course.DoesNotExist:
+        return Response({
+            "message": "Course not found",
+        }, status=status.HTTP_404_NOT_FOUND)
+    except CourseStatus.DoesNotExist:
+        return Response({
             "message": "You have not started this course",
-            "status": status.HTTP_404_NOT_FOUND,
-            "error": str(e)
-        }
-        return Response(data)
+        }, status=status.HTTP_404_NOT_FOUND)
+
+def has_incomplete_activities(course, user):
+    return Activity.objects.filter(course=course, created_by=user).exclude(status=Activity.STARTED).exists()
+
 
 @api_view(['POST'])
 def track_started(request, course_slug,lesson_slug):
@@ -207,3 +208,75 @@ def create_enrollment(request):
          "status":status.HTTP_201_CREATED
     }
     return Response(data)
+
+@api_view(['GET'])
+def get_my_created_courses(request):
+    try:
+        courses = Course.objects.filter(
+                        created_by=request.user,)
+
+        serializer = CourseListStatusSerializer(
+            courses, many=True)
+        return Response(serializer.data)
+
+    except Exception as e:
+        return Response({
+            "message": str(e),
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+@api_view(['GET'])
+def get_my_unpublished_courses(request):
+    try:
+        courses = Course.objects.filter(
+            created_by=request.user).filter(Q(status=Course.DRAFT) | Q(status=Course.IN_REVIEW))
+        serializer = CourseListStatusSerializer(courses, many=True)
+        return Response(serializer.data)
+
+    except Exception as e:
+        return Response({
+            "message": str(e),
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+@api_view(['GET'])
+def get_my_completed_courses(request):
+    try:
+        courses_status = CourseStatus.objects.filter(created_by=request.user, status=CourseStatus.DONE)
+        courses = []
+        for status in courses_status:
+            try:
+                course = Course.objects.get(pk=status.course_id)  # Assuming course_id is a valid field
+                courses.append(course)
+            except Course.DoesNotExist:
+                continue  # If a course does not exist, continue to the next one
+
+        serializer = CourseListStatusSerializer(courses, many=True)
+        return Response(serializer.data)
+    except Exception as e:
+        return Response({
+            "message": str(e),
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+
+@api_view(['GET'])
+def get_my_registered_courses(request):
+    try:
+        # Get all enrollments for the request.user
+        enrollments = Enrollment.objects.filter(created_by=request.user)
+        
+        # Extract the related courses
+        courses = [enrollment.course for enrollment in enrollments]
+
+        serializer = CourseListSerializer(courses, many=True)
+        return Response({
+            "courses": serializer.data,
+            "message": "Registered courses retrieved successfully",
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({
+            "message": str(e),
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
