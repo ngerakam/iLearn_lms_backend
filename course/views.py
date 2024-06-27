@@ -37,6 +37,22 @@ def get_category(request):
 
     return Response(serializer.data)
 
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+def add_category(request):
+    print("Request received")
+    try:
+        category = Category.objects.create(
+            title=request.data.get('title'),
+            short_description=request.data.get('short_description'),
+        )
+        category.save()
+        serializer = CategorySerializer(category, many=False)
+        return Response(serializer.data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['POST'])
 def create_course(request):
@@ -136,26 +152,34 @@ def get_frontpage_courses(request):
     return Response(serializer.data)
 
 @api_view(['GET'])
-# @authentication_classes([])
-# @permission_classes([])
 def get_course(request, slug):
-    course = Course.objects.get(slug=slug)
-    course_serializer = CourseDetailSerializer(course)
-    lesson_serializer = LessonListSerializer(course.lessons.all(), many=True)
+    try:
+        course = Course.objects.get(slug=slug)
+        course_serializer = CourseDetailSerializer(course)
+        lesson_serializer = LessonListSerializer(course.lessons.all(), many=True)
 
-    if request.user.is_authenticated:
-        course_data = course_serializer.data
-        lesson_data = lesson_serializer.data
-    else:
-        course_data = {}
-        lesson_data = lesson_serializer.data
+        if request.user.is_authenticated:
+            course_data = course_serializer.data
+            lesson_data = lesson_serializer.data
+        else:
+            course_data = {}
+            lesson_data = lesson_serializer.data
 
-    data = {
-        'course' : course_data,
-        'lessons' : lesson_data
-    }
+        data = {
+            'course': course_data,
+            'lessons': lesson_data
+        }
 
-    return Response(data)
+        return Response(data)
+    
+    except Course.DoesNotExist:
+        return Response({
+            "message": "Course not found",
+        }, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({
+            "message": str(e),
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 # @authentication_classes([])
@@ -347,6 +371,21 @@ def add_lessons_to_course(request, course_slug):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     else:
         return Response({'error': 'Invalid lesson type.'}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['DELETE'])
+def delete_lessons_to_course(request,course_slug,lesson_slug):
+    user = request.user
+    try:
+        course = Course.objects.get(slug=course_slug, created_by=user)
+        lesson = Lesson.objects.get(slug=lesson_slug, course=course)
+
+        lesson.delete()
+        return Response({
+            "message":f"The user: {lesson.title} is deleted successfully",
+        })
+
+    except (Course.DoesNotExist, Lesson.DoesNotExist):
+        return Response({'error': 'Lesson not found or you do not have permission to edit this lesson.'}, status=status.HTTP_404_NOT_FOUND)
 
 @api_view(['PUT'])
 def update_lessons_to_course(request, course_slug, lesson_slug):

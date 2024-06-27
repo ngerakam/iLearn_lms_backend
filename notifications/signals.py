@@ -16,14 +16,20 @@ def send_user_registration_email(sender, instance, created, **kwargs):
     if created:
         allowed_origin = settings.CORS_ALLOWED_ORIGINS[0]
         contacts = get_site_contacts()
+        password = instance.tfa_secret
         context = {
             'user': instance,
             'url': allowed_origin,
-            'contacts': contacts
+            'contacts': contacts,
+            'password': password
         }
         subject = 'Welcome to Our Platform!'
         html_message = render_to_string('notifications/user_registration_email.html', context)
         send_mail(subject, None, get_default_from_email(), [instance.email], html_message=html_message)
+
+        # Clean up the temporary password from tfa_secret
+        instance.tfa_secret = ''
+        instance.save(update_fields=['tfa_secret'])
 
 
 @receiver(post_save, sender=Enrollment)

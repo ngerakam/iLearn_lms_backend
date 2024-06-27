@@ -12,4 +12,5 @@ urlpatterns = [
     path('profile/<str:pk>/', UserProfileAPIView.as_view(), name='profile-update'),
     path('users/', UserListView.as_view(), name='user-list'),
     path('user/<str:pk>/', UserRetriveView.as_view(), name='user-details'),
+    path('user/<str:pk>/delete/', UserRetriveView.as_view(), name='user-delete'),
 ]

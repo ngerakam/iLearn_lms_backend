@@ -1,4 +1,4 @@
-import time, datetime, random, string
+import time, datetime, random, string, secrets
 #
 from django.core.mail import send_mail
 from django.http import QueryDict
@@ -19,64 +19,44 @@ from .serializers import UserSerializer, ProfileUserSerializer, SiteSetupSeriali
 
 class RegisterAPIView(APIView):
     permission_classes = [IsAuthenticated]
+
+    def generate_random_password(self, length=12):
+        characters = string.ascii_letters + string.digits + string.punctuation
+        password = ''.join(secrets.choice(characters) for i in range(length))
+        return password
+
     def post(self, request):
-            
-            if not request.user.is_superuser:
-                return Response({"error":"You are not allowed to access this"})
-            data = request.data
+        if not request.user.is_superuser:
+            return Response({"error": "You are not allowed to access this"})
+        data = request.data
 
-            # create a user
-            if data['selectedRole'] == 'admin':
-                user = User.objects.create(
-                    first_name=data['first_name'],
-                    last_name=data['last_name'],
-                    email=data['email'],
-                    is_teacher = False,
-                    is_student = False,
-                    is_superuser = True
-                )
-                user.set_password(data['first_name'])
-                user.save()
-            elif data['selectedRole'] == 'student':
-                user = User.objects.create(
-                    first_name=data['first_name'],
-                    last_name=data['last_name'],
-                    email=data['email'],
-                    is_teacher = False,
-                    is_student = True,
-                    is_superuser = False
-                )
-                user.set_password(data['first_name'])
-                user.save()
-            elif data['selectedRole'] == 'teacher':
-                user = User.objects.create(
-                    first_name=data['first_name'],
-                    last_name=data['last_name'],
-                    email=data['email'],
-                    is_teacher = True,
-                    is_student = False,
-                    is_superuser = False
-                )
-                user.set_password(data['first_name'])
-                user.save()
+        role = data.get('selectedRole')
+        user_data = {
+            "first_name": data.get('first_name'),
+            "last_name": data.get('last_name'),
+            "email": data.get('email'),
+            "is_teacher": role == 'teacher',
+            "is_student": role == 'student',
+            "is_superuser": role == 'admin'
+        }
 
-            # Delay for 2 seconds
-            time.sleep(2)
-            # Retrieve the user's profile
-            profile, created = UserProfile.objects.get_or_create(user=user)
+        random_password = self.generate_random_password()
+        user_data['tfa_secret'] = random_password  # Store the temporary password in tfa_secret
 
-            if data['gender'] == '':
-                profile.gender="None"
-            else:
-                profile.gender = data['gender']
+        user = User.objects.create(**user_data)
+        user.set_password(random_password)
+        user.save()
 
-            profile.save()
+        # Delay for 2 seconds
+        time.sleep(2)
 
-            serializer = UserSerializer(user)
-            # serializer.is_valid(raise_exception=True)
-            # serializer.save()
+        # Retrieve the user's profile
+        profile, created = UserProfile.objects.get_or_create(user=user)
+        profile.gender = data.get('gender', 'None')
+        profile.save()
 
-            return Response(serializer.data)
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
 
 class UserListView(APIView):
     permission_classes = [IsAuthenticated]
@@ -104,10 +84,16 @@ class UserRetriveView(APIView):
         user.is_teacher = request.data['is_teacher']
         user.is_student = request.data['is_student']
         user.save()
-        print(user)
         serializer = UserSerializer(user)
 
-        return Response(serializer.data)       
+        return Response(serializer.data)
+    
+    def delete(self,request,pk=None):
+        user = User.objects.get(pk=pk)
+        user.delete()
+        return Response({
+            "message":f"The user: {user.email} is deleted successfully",
+        })
    
 class UserProfileAPIView(APIView):
     permission_classes = [IsAuthenticated]

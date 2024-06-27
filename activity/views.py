@@ -246,12 +246,12 @@ def get_my_completed_courses(request):
         courses = []
         for status in courses_status:
             try:
-                course = Course.objects.get(pk=status.course_id)  # Assuming course_id is a valid field
+                course = Course.objects.get(pk=status.course_id)
                 courses.append(course)
             except Course.DoesNotExist:
-                continue  # If a course does not exist, continue to the next one
+                continue  # Skip this CourseStatus if the corresponding Course does not exist
 
-        serializer = CourseListStatusSerializer(courses, many=True)
+        serializer = CourseListSerializer(courses, many=True)
         return Response(serializer.data)
     except Exception as e:
         return Response({
