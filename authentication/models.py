@@ -3,7 +3,7 @@ import random, string, os
 from django.core.exceptions import ValidationError
 from django.dispatch import receiver
 from django.conf import settings
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save,post_delete
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db import models
@@ -22,8 +22,8 @@ class UserManager(BaseUserManager):
             email = self.normalize_email(email)
         )
         user.set_password(password)
-        user.is_admin= False
         user.is_staff= False
+        user.is_admin=False
         user.is_student= False
         user.is_teacher = False
         user.save(using=self._db)
@@ -39,8 +39,8 @@ class UserManager(BaseUserManager):
             email = self.normalize_email(email)
         )
         user.set_password(password)
-        user.is_admin= True
         user.is_staff= True
+        user.is_admin=True
         user.is_student= False
         user.is_teacher = False
         user.is_superuser= True
@@ -57,6 +57,7 @@ class User(AbstractUser):
     email = models.CharField(max_length=255, unique=True)
     password = models.CharField(max_length=255)
     username = None
+    is_admin = models.BooleanField(default=False)
     is_teacher = models.BooleanField(default=False)
     is_student = models.BooleanField(default=False)
     tfa_secret = models.CharField(max_length=255, default='',blank=True,null=True)
@@ -74,8 +75,11 @@ class User(AbstractUser):
     def __str__(self):
         return f"{self.first_name} {self.last_name}, email: {self.email}"
 
+
+
 def profile_image_upload_to(instance, filename):
     return os.path.join( 'profiles', str(instance.id), filename)
+
 class UserProfile(models.Model):
 
     GENDER_CHOICES = [
@@ -100,6 +104,15 @@ class UserProfile(models.Model):
 
 def site_image_upload_to(instance, filename):
     return os.path.join( 'site', str(instance.id), 'config', filename)
+
+class UserLearningPath(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='learning_paths')
+    learning_path = models.ForeignKey('course.LearningPath', on_delete=models.CASCADE, related_name='user_learning_paths')
+
+    def __str__(self):
+        return f"{self.user.name} - {self.learning_path.title}"
+
+
 class SiteSetup(models.Model):
     title = models.CharField(max_length=100, blank=True, null=True)
     card1_name = models.CharField(max_length=100, blank=True, null=True)
@@ -130,6 +143,7 @@ class SiteSetup(models.Model):
         return super(SiteSetup, self).save(*args, **kwargs)
     
 
+
 class SiteAbout(models.Model):
     site = models.OneToOneField(SiteSetup,related_name='abouts', on_delete=models.CASCADE)
     about_message = models.TextField(blank=True, null=True)
@@ -139,12 +153,12 @@ class SiteAbout(models.Model):
 
     def __str__(self):
         return f"About for: {self.site}"
-    
+
 class SiteAddress(models.Model):
     site = models.OneToOneField(SiteSetup,related_name='addresses', on_delete=models.CASCADE)
     email_contact = models.CharField(max_length=250, blank=True, null=True)
     phone_contact = models.CharField(max_length=250, blank=True, null=True)
-    location_address = models.CharField(max_length=250, blank=True, null=True)
+    location_address = models.TextField(blank=True, null=True)
 
     class Meta:
         verbose_name_plural = 'SiteAddress'

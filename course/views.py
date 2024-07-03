@@ -1,460 +1,504 @@
-import time, os ,subprocess
-from django.conf import settings
-# from django.contrib.auth.models import User
-from django.core.files.base import ContentFile
-from django.core.files.uploadedfile import InMemoryUploadedFile
-
+from rest_framework import exceptions,status
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.exceptions import NotFound
+from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework import status
 
-from .models import Course, Lesson, Comment, Category, Quiz
-from .serializers import (CourseListSerializer, CourseDetailSerializer,
-                          CourseDetailStatusSerializer,
-                           LessonListSerializer , CommentSerializer,
-                             CategorySerializer, QuizSerializer,
-                             UserSerializer)
+from .models import (Course, Lesson, Comment, Category,
+                     LearningPath, Enrollment, Module, Progress
+                     )
+from .serializers import (LearningPathSerializer, CategorySerializer, CourseSerializer,
+                          CourseStatusSerializer, CourseDetailSerializer, ModuleSerializer,
+                            CourseDetailStatusSerializer, LessonSerializer, CommentSerializer,
+                             EnrollmentSerializer, ProgressSerializer)
 
-from authentication.models import User
+class LearningPathListAPIView(APIView):
+    def get(self, request):
+        try:
+            learning_paths = LearningPath.objects.all()
+            serializer = LearningPathSerializer(learning_paths, many=True)
 
-from docx import Document
-from pptx import Presentation
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
 
-@api_view(['GET'])
-def get_quiz(request, course_slug, lesson_slug):
-    lesson = Lesson.objects.get(slug=lesson_slug)
-    quiz = lesson.quizzes.all()
-    serializer = QuizSerializer(quiz, many=True)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response(serializer.data)
-
-@api_view(['GET'])
-@authentication_classes([])
-@permission_classes([])
-def get_category(request):
-    categories = Category.objects.all()
-    serializer = CategorySerializer(categories, many=True)
-
-    return Response(serializer.data)
-
-@api_view(['POST'])
-@authentication_classes([])
-@permission_classes([])
-def add_category(request):
-    print("Request received")
-    try:
-        category = Category.objects.create(
-            title=request.data.get('title'),
-            short_description=request.data.get('short_description'),
-        )
-        category.save()
-        serializer = CategorySerializer(category, many=False)
-        return Response(serializer.data)
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(['POST'])
-def create_course(request):
-    try:
-        course = Course.objects.create(
-            title=request.data.get('title'),
-            short_description=request.data.get('short_description'),
-            long_description=request.data.get('long_description'),
-            status=request.data.get('status'),
-            created_by=request.user,
-        )
-
-        for category_id in request.data.getlist('categories[]'):
-            category = Category.objects.get(id=category_id)
-            course.categories.add(category)
-
-        image_file = request.data.get('image')
-        if image_file:
-            course.image.save(image_file.name, image_file)
-
-        course.save()
-
-        serializer = CourseListSerializer(course, many=False)
-        
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['PUT'])
-def update_course(request, slug):
-    try:
-        course = Course.objects.get(slug=slug, created_by=request.user)
-        
-        course.title = request.data.get('title', course.title)
-        course.short_description = request.data.get('short_description', course.short_description)
-        course.long_description = request.data.get('long_description', course.long_description)
-        course.status = request.data.get('status', course.status)
-        
-        # Update categories
-        category_ids = request.data.getlist('categories[]')
-        if category_ids:
-            categories = Category.objects.filter(id__in=category_ids)
-            course.categories.set(categories)
-        
-        # Update image if provided
-        image_file = request.data.get('image')
-        if image_file:
-            course.image.save(image_file.name, image_file)
-        
-        course.save()
-
-        serializer = CourseListSerializer(course, many=False)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    except Course.DoesNotExist:
-        return Response({'error': 'Course not found or you do not have permission to edit this course.'}, status=status.HTTP_404_NOT_FOUND)
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['GET'])
-@authentication_classes([])
-@permission_classes([])
-def get_courses(request):
-    category_id = request.GET.get('category_id','')
-    courses = Course.objects.filter(status=Course.PUBLISHED)
-
-    if category_id:
-        courses = courses.filter(categories__in=[int(category_id)])
-
-    serializer = CourseListSerializer(courses, many=True)
-
-    return Response(serializer.data)
-
-@api_view(['GET'])
-@authentication_classes([])
-@permission_classes([])
-def get_user_courses(request):
-    category_id = request.GET.get('category_id','')
-    courses = Course.objects.filter(created_by=request.user)
-
-    if category_id:
-        courses = courses.filter(categories__in=[int(category_id)])
-
-    serializer = CourseListSerializer(courses, many=True)
-
-    return Response(serializer.data)
-
-
-@api_view(['GET'])
-@authentication_classes([])
-@permission_classes([])
-def get_frontpage_courses(request):
-    courses = Course.objects.filter(status=Course.PUBLISHED)[0:4]
-    serializer = CourseListSerializer(courses, many=True)
-
-    return Response(serializer.data)
-
-@api_view(['GET'])
-def get_course(request, slug):
-    try:
-        course = Course.objects.get(slug=slug)
-        course_serializer = CourseDetailSerializer(course)
-        lesson_serializer = LessonListSerializer(course.lessons.all(), many=True)
-
-        if request.user.is_authenticated:
-            course_data = course_serializer.data
-            lesson_data = lesson_serializer.data
-        else:
-            course_data = {}
-            lesson_data = lesson_serializer.data
-
-        data = {
-            'course': course_data,
-            'lessons': lesson_data
-        }
-
-        return Response(data)
     
-    except Course.DoesNotExist:
-        return Response({
-            "message": "Course not found",
-        }, status=status.HTTP_404_NOT_FOUND)
-    except Exception as e:
-        return Response({
-            "message": str(e),
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    def post(self, request):
+        data = request.data
+        try:
+            learning_Path = LearningPath.objects.create(
+                title = data.get('title'),
+                description = data.get('description')
+            )
+            learning_Path.save()
+            serializer = LearningPathSerializer(learning_Path, many=False)
 
-@api_view(['GET'])
-# @authentication_classes([])
-# @permission_classes([])
-def get_course_with_status(request, slug):
-    course = Course.objects.get(slug=slug)
-    course_serializer = CourseDetailStatusSerializer(course)
-    lesson_serializer = LessonListSerializer(course.lessons.all(), many=True)
+            return Response({'data':serializer.data},status=status.HTTP_201_CREATED)
 
-    if request.user.is_authenticated:
-        course_data = course_serializer.data
-        lesson_data = lesson_serializer.data
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+class LearningPathAPIView(APIView):
+    def get(self, request, lp_slug):
+        try:
+            learning_paths = LearningPath.objects.get(slug=lp_slug)
+            serializer = LearningPathSerializer(learning_paths, many=False)
 
-    else:
-        course_data = {}
-        lesson_data = lesson_serializer.data
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
 
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    data = {
-        'course' : course_data,
-        'lessons' : lesson_data
-    }
+    def put(self,request,lp_slug):
+        data = request.data
+        try:
+            learning_Path = LearningPath.objects.get(slug=lp_slug)
+            learning_Path.title = data.get('title')
+            learning_Path.description = data.get('description')
+            learning_Path.save()
+            serializer = LearningPathSerializer(learning_Path, many=False)
 
-    return Response(data)
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
 
-@api_view(['GET'])
-# @authentication_classes([])
-# @permission_classes([])
-def get_course_lessons(request, slug):
-    course = Course.objects.get(slug=slug)
-    lesson_serializer = LessonListSerializer(course.lessons.all(), many=True)
-
-    if request.user.is_authenticated:
-        lesson_data = lesson_serializer.data
-    else:
-        lesson_data = lesson_serializer.data
-
-    data = {
-        'lessons' : lesson_data,
-    }
-
-    return Response(data)
-
-@api_view(['GET'])
-# @authentication_classes([])
-# @permission_classes([])
-def get_created_course(request, slug):
-    course = Course.objects.get(slug=slug)
-    course_serializer = CourseDetailSerializer(course)
-    lesson_serializer = LessonListSerializer(course.lessons.all(), many=True)
-
-    if request.user.is_authenticated:
-        course_data = course_serializer.data
-        lesson_data = lesson_serializer.data
-    else:
-        course_data = {}
-        lesson_data = lesson_serializer.data
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
-    data = {
-        'course' : course_data,
-        'lessons' : lesson_data
-    }
+    def delete(self,request,lp_slug):
+        try:
+            learning_path = LearningPath.objects.get(slug=lp_slug)
+            learning_path.delete()
 
-    return Response(data)
+            return Response(
+                {"data": f" The Learning Path {learning_path.title} has been deleted successfully"}
+                ,status=status.HTTP_202_ACCEPTED)
 
-@api_view(['GET'])
-def get_comment(request, course_slug, lesson_slug):
-    lesson = Lesson.objects.get(slug=lesson_slug)
-    serializer = CommentSerializer(lesson.comments.all(), many=True)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response(serializer.data)
+class CategoryListAPIView(APIView):
+    def get(self, request):
+        try:
+            categories = Category.objects.all()
+            serializer = CategorySerializer(categories, many=True)
 
-@api_view(['POST'])
-def add_comment(request, course_slug, lesson_slug):
-    data = request.data
-    name = data.get('name')
-    content = data.get('content')
-    course = Course.objects.get(slug=course_slug)
-    lesson = Lesson.objects.get(slug=lesson_slug)
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
 
-    comment = Comment.objects.create(course=course, lesson=lesson, name=name,
-                                      content=content, created_by=request.user)
-    
-    serializer = CommentSerializer(comment)
-    
-    return Response(serializer.data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['GET'])
-def get_author_courses(request, user_id):
-    user = User.objects.get(pk=user_id)
-    courses = user.courses.filter(status=Course.PUBLISHED)
+    def post(self, request):
+        data = request.data
+        try:
+            category = Category.objects.create(
+                title = data.get('title'),
+                description = data.get('description')
+            )
+            category.save()
+            serializer = CategorySerializer(category, many=False)
 
-    user_serializer = UserSerializer(user, many=False)
-    courses_serializer = CourseListSerializer(courses, many=True)
+            return Response({'data':serializer.data},status=status.HTTP_201_CREATED)
 
-    return Response({
-            'courses': courses_serializer.data,
-            'created_by': user_serializer.data
-         })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+class CategoryAPIView(APIView):
+    def get(self, request, cat_slug):
+        try:
+            category = Category.objects.get(slug=cat_slug)
+            serializer = CategorySerializer(category, many=False)
 
-@api_view(['GET'])
-def get_user_lesson(request,course_slug,lesson_slug):
-    user = request.user
-    lesson = Lesson.objects.get(slug=lesson_slug,
-                                 course__slug=course_slug,
-                                   course__created_by=user)
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
 
-    serializer = LessonListSerializer(lesson, many=False)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response(serializer.data)
+    def put(self,request,cat_slug):
+        data = request.data
+        try:
+            category = Category.objects.get(slug=cat_slug)
+            category.title = data.get('title')
+            category.description = data.get('description')
+            category.save()
+            serializer = CategorySerializer(category, many=False)
 
-@api_view(['POST'])
-def add_lessons_to_course(request, course_slug):
-    user = request.user
-    
-    try:
-        course = Course.objects.get(slug=course_slug, created_by=user)
-    except Course.DoesNotExist:
-        return Response({'error': 'Course not found or you do not have permission to add lessons to this course.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
 
-    lesson_type = request.data.get('lesson_type')
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+    def delete(self,request,cat_slug):
+        try:
+            category = Category.objects.get(slug=cat_slug)
+            category.delete()
 
-    def extract_quiz_data(data):
-        quiz_data = {}
-        for key, value in data.items():
-            if key.startswith('quizObject'):
-                parts = key.split('[')
-                index = int(parts[1][:-1])
-                field = parts[2][:-1]
-                if index not in quiz_data:
-                    quiz_data[index] = {}
-                quiz_data[index][field] = value[0]
-        return quiz_data
+            return Response(
+                {"data": f" The Category {category.title}  has been deleted successfully"}
+                ,status=status.HTTP_202_ACCEPTED)
 
-    if lesson_type in ['article', 'video', 'file', 'quiz']:
-        lesson_data = {
-            'course': course,
-            'title': request.data.get('title'),
-            'short_description': request.data.get('short_description'),
-            'status': request.data.get('status'),
-        }
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        if lesson_type == 'article':
-            lesson_data['lesson_type'] = 'article'
-            lesson_data['long_description'] = request.data.get('long_description')
-        elif lesson_type == 'video':
-            lesson_data['lesson_type'] = 'video'
-            video_file = request.data.get('video')
-            if video_file:
-                lesson_data['video'] = video_file
+class CoursesListAPIView(ListAPIView):
+    serializer_class = CourseSerializer
+    queryset = Course.objects.all()
+
+    def get(self, request, *args, **kwargs):
+        try:
+            lp_slug = self.request.query_params.get('lp_slug')
+            cat_slug = self.request.query_params.get('cat_slug')
+
+            if lp_slug:
+                queryset = self.filter_by_learning_path(lp_slug)
+            elif cat_slug:
+                queryset = self.filter_by_category(cat_slug)
             else:
-                lesson_data['youtube_id'] = request.data.get('youtube_id')
-        elif lesson_type == 'file':
-            lesson_data['lesson_type'] = 'file'
-            document_file = request.data.get('document')
-            if document_file:
-                lesson_data['file'] = document_file
-        elif lesson_type == 'quiz':
-            lesson_data['lesson_type'] = 'quiz'
-            
-            quiz_data = extract_quiz_data(request.data)
+                queryset = self.get_queryset()
 
-            lesson = Lesson.objects.create(**lesson_data)
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({'data': serializer.data}, status=status.HTTP_200_OK)
 
-            for index, data in quiz_data.items():
-                question = data.get('question', None)
-                op1 = data.get('op1', None)
-                op2 = data.get('op2', None)
-                op3 = data.get('op3', None)
-                answer = data.get('answer', None)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+    def filter_by_learning_path(self, lp_slug):
+        courses = Course.objects.filter(learning_path__slug=lp_slug)
+        return courses
 
-                # Create the Quiz object without using defaults
-                quiz = Quiz.objects.create(
-                    lesson=lesson,
-                    question=question,
-                    op1=op1,
-                    op2=op2,
-                    op3=op3,
-                    answer=answer
-                )
+    def filter_by_category(self, cat_slug):
+        courses = Course.objects.filter(categories__slug=cat_slug)
+        return courses
 
-            serializer = LessonListSerializer(lesson, many=False)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response({'error': 'Invalid lesson type.'}, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request):
+        data = request.data
+        try:
+            course = Course.objects.create(
+                title = data.get('title'),
+                status=data.get('status'),
+                created_by=request.user,
+                short_description = data.get('short_description'),
+                long_description = data.get('long_description')
+            )
+            if 'categories' in data:
+                category_ids = data['categories']
+                for category_id in category_ids:
+                    category = Category.objects.get(id=category_id)
+                    course.categories.add(category)
+            image_file = data.get('image')
+            if image_file:
+                course.image.save(image_file.name, image_file)
+            course.save()
+            serializer = CourseDetailSerializer(course, many=False)
 
-        lesson = Lesson.objects.create(**lesson_data)
-        serializer = LessonListSerializer(lesson, many=False)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    else:
-        return Response({'error': 'Invalid lesson type.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'data':serializer.data},status=status.HTTP_201_CREATED)
 
-@api_view(['DELETE'])
-def delete_lessons_to_course(request,course_slug,lesson_slug):
-    user = request.user
-    try:
-        course = Course.objects.get(slug=course_slug, created_by=user)
-        lesson = Lesson.objects.get(slug=lesson_slug, course=course)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+class CoursesAPIView(APIView):
+    def get(self, request, course_slug):
+        try:
+            course = Course.objects.get(slug=course_slug)
+            serializer = CourseDetailSerializer(course, many=False)
 
-        lesson.delete()
-        return Response({
-            "message":f"The user: {lesson.title} is deleted successfully",
-        })
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
 
-    except (Course.DoesNotExist, Lesson.DoesNotExist):
-        return Response({'error': 'Lesson not found or you do not have permission to edit this lesson.'}, status=status.HTTP_404_NOT_FOUND)
-
-@api_view(['PUT'])
-def update_lessons_to_course(request, course_slug, lesson_slug):
-    user = request.user
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
-    try:
-        course = Course.objects.get(slug=course_slug, created_by=user)
-        lesson = Lesson.objects.get(slug=lesson_slug, course=course)
-    except (Course.DoesNotExist, Lesson.DoesNotExist):
-        return Response({'error': 'Lesson not found or you do not have permission to edit this lesson.'}, status=status.HTTP_404_NOT_FOUND)
+    def put(self,request,course_slug):
+        data = request.data
+        try:
+            course = Course.objects.get(slug=course_slug, created_by=request.user)
+            course.title = data.get('title')
+            course.long_description = data.get('long_description')
+            course.short_description = data.get('short_description')
+            course.status=data.get('status')
 
-    lesson_type = request.data.get('lesson_type')
+            if 'categories' in data:
+                category_ids = data['categories']
+                categories = Category.objects.filter(id__in=category_ids)
+                course.categories.set(categories)
 
-    def extract_quiz_data(data):
-        quiz_data = {}
-        for key, value in data.items():
-            if key.startswith('quizObject'):
-                parts = key.split('[')
-                index = int(parts[1][:-1])
-                field = parts[2][:-1]
-                if index not in quiz_data:
-                    quiz_data[index] = {}
-                quiz_data[index][field] = value[0]
-        return quiz_data
+            image_file = data.get('image')
+            if image_file:
+                course.image.save(image_file.name, image_file)           
+            course.save()
+            serializer = CourseDetailSerializer(course, many=False)
 
-    if lesson_type in ['article', 'video', 'file', 'quiz']:
-        lesson.title = request.data.get('title', lesson.title)
-        lesson.short_description = request.data.get('short_description', lesson.short_description)
-        lesson.status = request.data.get('status', lesson.status)
-        lesson.lesson_type = lesson_type
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
 
-        if lesson_type == 'article':
-            lesson.long_description = request.data.get('long_description', lesson.long_description)
-        elif lesson_type == 'video':
-            video_file = request.data.get('video')
-            if video_file:
-                lesson.video = video_file
-                lesson.youtube_id = None  # Clear youtube_id if video file is provided
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+    def delete(self,request,course_slug):
+        try:
+            course = Course.objects.get(slug=course_slug, created_by=request.user)
+            course.delete()
+
+            return Response(
+                {"data": f" The Course {course.title}  has been deleted successfully"}
+                ,status=status.HTTP_202_ACCEPTED)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class ModuleListAPiView(APIView):
+    def get(self, request, course_slug):
+        try:
+            modules = Module.objects.filter(course__slug=course_slug)
+            serializer = ModuleSerializer(modules, many=True)
+
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def post(self, request, course_slug):
+        data = request.data
+        try:
+            course = Course.objects.get(slug=course_slug)
+            module = Module.objects.create(
+                course = course,
+                title = data.get('title'),
+                description = data.get('description'),
+                is_open = data.get('is_open')
+            )
+            module.save()
+            serializer = ModuleSerializer(module, many=False)
+
+            return Response({'data':serializer.data},status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class  ModuleAPiView(APIView):
+    def get(self, request, course_slug, mod_slug):
+        try:
+            module = Module.objects.get(course__slug=course_slug, slug=mod_slug)
+            serializer = ModuleSerializer(module, many=False)
+
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self,request, course_slug, mod_slug):
+        data = request.data
+        try:
+            module = Module.objects.get(course__slug=course_slug, slug=mod_slug)
+            module.title = data.get('title')
+            module.description = data.get('description')
+            module.is_open = data.get('is_open')
+            module.save()
+            serializer = ModuleSerializer(module, many=False)
+
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+    def delete(self,request, course_slug, mod_slug):
+        try:
+            module = Module.objects.get(course__slug=course_slug, slug=mod_slug)
+            module.delete()
+
+            return Response(
+                {"data": f" The Module {module.title}  has been deleted successfully"}
+                ,status=status.HTTP_202_ACCEPTED)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class LessonListAPIView(APIView):
+    def get(self, request, course_slug, mod_slug):
+        try:
+            lessons = Lesson.objects.filter(module__slug=mod_slug)
+            serializer = LessonSerializer(lessons, many=True)
+
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def post(self, request, course_slug, mod_slug):
+        data = request.data
+        try:
+            lesson_type = data.get('lesson_type')
+            module = Module.objects.get(slug=mod_slug)
+            if lesson_type in ['article', 'video', 'file', 'quiz']:
+                lesson_data = {
+                    'module': module,
+                    'title': data.get('title'),
+                    'short_description':data.get('short_description'),
+                    'status': data.get('status'),
+                }
+
+                if lesson_type == 'article':
+                    lesson_data['lesson_type'] = 'article'
+                    lesson_data['long_description'] = data.get('long_description')
+                elif lesson_type == 'video':
+                    lesson_data['lesson_type'] = 'video'
+                    video_file = data.get('video')
+                    if video_file:
+                        lesson_data['video'] = video_file
+                    else:
+                        lesson_data['youtube_id'] = data.get('youtube_id')
+                elif lesson_type == 'file':
+                    lesson_data['lesson_type'] = 'file'
+                    document_file = request.data.get('document')
+                    if document_file:
+                        lesson_data['file'] = document_file
+                elif lesson_type == 'quiz':
+                    pass
+
+                lesson = Lesson.objects.create(**lesson_data)
+
+                serializer = LessonSerializer(lesson, many=False)
+
+                return Response({'data':serializer.data},status=status.HTTP_201_CREATED)
             else:
-                lesson.youtube_id = request.data.get('youtube_id', lesson.youtube_id)
-        elif lesson_type == 'file':
-            document_file = request.data.get('document')
-            if document_file:
-                lesson.file = document_file
-        elif lesson_type == 'quiz':
-            quiz_data = extract_quiz_data(request.data)
+                return Response({'error': 'Invalid lesson type.'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Clear existing quizzes for the lesson
-            Quiz.objects.filter(lesson=lesson).delete()
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-            for index, data in quiz_data.items():
-                question = data.get('question')
-                op1 = data.get('op1')
-                op2 = data.get('op2')
-                op3 = data.get('op3')
-                answer = data.get('answer')
+class LessonAPIView(APIView):
+    def get(self, request, course_slug, mod_slug,lesson_slug):
+        try:
+            lesson = Lesson.objects.get(module__slug=mod_slug, slug=lesson_slug)
+            serializer = LessonSerializer(lesson, many=False)
 
-                Quiz.objects.create(
-                    lesson=lesson,
-                    question=question,
-                    op1=op1,
-                    op2=op2,
-                    op3=op3,
-                    answer=answer
-                )
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
 
-        lesson.save()
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = LessonListSerializer(lesson, many=False)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    else:
-        return Response({'error': 'Invalid lesson type.'}, status=status.HTTP_400_BAD_REQUEST)
+    def put(self,request, course_slug, mod_slug,lesson_slug):
+        data = request.data
+        try:
+            lesson = Lesson.objects.get(module__slug=mod_slug, slug=lesson_slug)
+            lesson.title = data.get('title')
+            lesson.description = data.get('description')
+            lesson.is_open = data.get('is_open')
+            lesson.save()
+            serializer = LessonSerializer(lesson, many=False)
+
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+    def delete(self,request, course_slug, mod_slug,lesson_slug):
+        try:
+            lesson = Lesson.objects.get(module__slug=mod_slug, slug=lesson_slug)
+            lesson.delete()
+
+            return Response(
+                {"data": f" The Lesson {lesson.title}  has been deleted successfully"}
+                ,status=status.HTTP_202_ACCEPTED)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class CommentListAPIView(APIView):
+    def get(self, request, course_slug, mod_slug, lesson_slug):
+        try:
+            comments = Comment.objects.filter(lesson__slug=lesson_slug)
+            serializer = CommentSerializer(comments, many=True)
+
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def post(self, request, course_slug, mod_slug, lesson_slug):
+        data = request.data
+        try:
+            lesson = Lesson.objects.get(slug=lesson_slug, module__slug=mod_slug)
+            comment = Comment.objects.create(
+                lesson = lesson,
+                title = data.get('title'),
+                content = data.get('content'),
+                created_by = request.user
+            )
+            comment.save()
+            serializer = CommentSerializer(comment, many=False)
+
+            return Response({'data':serializer.data},status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class CommentAPIView(APIView):
+    def get(self, request, course_slug, mod_slug, lesson_slug, pk=None):
+        try:
+            comment = Comment.objects.get(pk=pk,lesson__slug=lesson_slug)
+            serializer = CommentSerializer(comment, many=False)
+
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request, course_slug, mod_slug, lesson_slug, pk=None):
+        data = request.data
+        try:
+            comment = Comment.objects.get(pk=pk,lesson__slug=lesson_slug)
+            comment.title = data.get('title')
+            comment.content = data.get('content')
+            comment.save()
+            serializer = CommentSerializer(comment, many=False)
+
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+    def delete(self, request, course_slug, mod_slug, lesson_slug, pk=None):
+        try:
+            comment = Comment.objects.get(pk=pk,lesson__slug=lesson_slug)
+            comment.delete()
+
+            return Response(
+                {"data": f" The Comment {comment.title}  has been deleted successfully"}
+                ,status=status.HTTP_202_ACCEPTED)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class EnrollmentListAPIView(APIView):
+    def get(self, request, course_slug):
+        try:
+            enrollments = Enrollment.objects.filter(course__slug=course_slug)
+            serializer = EnrollmentSerializer(enrollments, many=True)
+
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def post(self, request, course_slug):
+        try:
+            course = Course.objects.get(slug=course_slug)
+            enrollment = Enrollment.objects.create(
+                course = course,
+                user = request.user
+            )
+            enrollment.save()
+            serializer = EnrollmentSerializer(enrollment, many=False)
+
+            return Response({'data':serializer.data},status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class ProgressListAPIView(APIView):
+    def get(self, request, course_slug):
+        try:
+            progress = Progress.objects.filter(course__slug=course_slug)
+            serializer = ProgressSerializer(progress, many=True)
+
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

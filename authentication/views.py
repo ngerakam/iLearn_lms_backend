@@ -20,13 +20,8 @@ from .serializers import UserSerializer, ProfileUserSerializer, SiteSetupSeriali
 class RegisterAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def generate_random_password(self, length=12):
-        characters = string.ascii_letters + string.digits + string.punctuation
-        password = ''.join(secrets.choice(characters) for i in range(length))
-        return password
-
     def post(self, request):
-        if not request.user.is_superuser:
+        if not request.user.is_admin:
             return Response({"error": "You are not allowed to access this"})
         data = request.data
 
@@ -37,14 +32,11 @@ class RegisterAPIView(APIView):
             "email": data.get('email'),
             "is_teacher": role == 'teacher',
             "is_student": role == 'student',
-            "is_superuser": role == 'admin'
+            "is_admin": role == 'admin'
         }
 
-        random_password = self.generate_random_password()
-        user_data['tfa_secret'] = random_password  # Store the temporary password in tfa_secret
-
         user = User.objects.create(**user_data)
-        user.set_password(random_password)
+        
         user.save()
 
         # Delay for 2 seconds
@@ -134,6 +126,9 @@ class UserProfileAPIView(APIView):
             # Serialize the updated profile data
             serializer = ProfileUserSerializer(profile)
             return Response(serializer.data)
+        
+class UserPasswordResetAPI(APIView):
+    pass
 class SiteSetupDetailAPIView(APIView):
     def get(self, request, *args, **kwargs):
         try:
