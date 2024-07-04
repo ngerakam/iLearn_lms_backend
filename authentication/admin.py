@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.models import Group
-from .models import User, UserProfile, SiteAbout, SiteSetup, SiteAddress, UserLearningPath
+from .models import (User, UserProfile,
+                      SiteAbout, SiteSetup,
+                        SiteAddress, UserLearningPath)
 
 class UserAdmin(admin.ModelAdmin):
     list_display = ('email', 'first_name', 'last_name', 'get_groups')
@@ -16,3 +18,4 @@ admin.site.register(UserLearningPath)
 admin.site.register(SiteAbout)
 admin.site.register(SiteSetup)
 admin.site.register(SiteAddress)
+

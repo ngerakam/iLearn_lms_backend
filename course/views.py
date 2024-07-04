@@ -1,4 +1,3 @@
-from rest_framework import exceptions,status
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
@@ -443,7 +442,7 @@ class CommentAPIView(APIView):
     def put(self, request, course_slug, mod_slug, lesson_slug, pk=None):
         data = request.data
         try:
-            comment = Comment.objects.get(pk=pk,lesson__slug=lesson_slug)
+            comment = Comment.objects.get(pk=pk,lesson__slug=lesson_slug, created_by=request.user)
             comment.title = data.get('title')
             comment.content = data.get('content')
             comment.save()
@@ -456,7 +455,7 @@ class CommentAPIView(APIView):
         
     def delete(self, request, course_slug, mod_slug, lesson_slug, pk=None):
         try:
-            comment = Comment.objects.get(pk=pk,lesson__slug=lesson_slug)
+            comment = Comment.objects.get(pk=pk,lesson__slug=lesson_slug, created_by=request.user)
             comment.delete()
 
             return Response(
@@ -472,7 +471,7 @@ class EnrollmentListAPIView(APIView):
             enrollments = Enrollment.objects.filter(course__slug=course_slug)
             serializer = EnrollmentSerializer(enrollments, many=True)
 
-            return Response({'data':serializer.data},status=status.HTTP_200_OK)
+            return Response({'data':serializer.data,},status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -488,6 +487,17 @@ class EnrollmentListAPIView(APIView):
             serializer = EnrollmentSerializer(enrollment, many=False)
 
             return Response({'data':serializer.data},status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class EnrollmentAPIView(APIView):
+    def get(self, request, course_slug, pk=None):
+        try:
+            enrollment = Enrollment.objects.get(pk=pk,course__slug=course_slug)
+            serializer = EnrollmentSerializer(enrollment, many=False)
+
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

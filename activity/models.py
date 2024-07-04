@@ -20,6 +20,7 @@ class CourseActivity(models.Model):
 
     class Meta:
         verbose_name_plural = 'CourseActivities'
+        unique_together = ('course', 'created_by')
 
     def __str__(self):
         return f"For: {self.created_by}, Course: {self.course}, Status: {self.status}"
@@ -32,6 +33,7 @@ class ModuleActivity(models.Model):
 
     class Meta:
         verbose_name_plural = 'ModuleActivities'
+        unique_together = ('module', 'created_by')
 
     def __str__(self):
         return f"For: {self.created_by}, Course: {self.module}, Status: {self.status}"
@@ -44,6 +46,7 @@ class LessonActivity(models.Model):
 
     class Meta:
         verbose_name_plural = 'LessonActivities'
+        unique_together = ('lesson', 'created_by')
 
     def __str__(self):
         return f"For: {self.created_by}, Lesson: {self.lesson}, Status: {self.status}"

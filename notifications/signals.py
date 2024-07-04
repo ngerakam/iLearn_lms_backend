@@ -11,40 +11,7 @@ from course.models import Course
 from django.shortcuts import get_object_or_404
 
 
-@receiver(post_save, sender=User)
-def send_user_registration_email(sender, instance, created, **kwargs):
-    if created:
-        allowed_origin = settings.CORS_ALLOWED_ORIGINS[0]
-        contacts = get_site_contacts()
-        password = generate_random_password()
 
-        # Determine the user role and select the appropriate email template
-        if instance.is_admin:
-            template_name = 'notifications/user_registration_email_admin.html'
-            subject = 'Welcome, Admin!'
-        elif instance.is_teacher:
-            template_name = 'notifications/user_registration_email_teacher.html'
-            subject = 'Welcome, Teacher!'
-        elif instance.is_student:
-            template_name = 'notifications/user_registration_email_student.html'
-            subject = 'Welcome, Student!'
-        else:
-            template_name = 'notifications/user_registration_email.html'
-            subject = 'Welcome to Our Platform!'
-
-        context = {
-            'user': instance,
-            'url': allowed_origin,
-            'contacts': contacts,
-            'password': password
-        }
-
-        html_message = render_to_string(template_name, context)
-        send_mail(subject, None, get_default_from_email(), [instance.email], html_message=html_message)
-
-        # Clean up the temporary password from tfa_secret
-        instance.password = make_password(password)
-        instance.save(update_fields=['password'])
 
 
 # @receiver(post_save, sender=Enrollment)

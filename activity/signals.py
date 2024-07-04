@@ -246,11 +246,11 @@ def log_delete(sender, instance, **kwargs):
 def log_activity_save(sender, instance, created, **kwargs):
     if created:
         ActivityLog.objects.create(
-            message=f"A new {sender.__name__} activity has been created for '{instance.created_by}'."
+            message=f"A new {sender.__name__} has been created for '{instance.created_by}'."
         )
     else:
         ActivityLog.objects.create(
-            message=f"The {sender.__name__} activity for '{instance.created_by}' has been updated."
+            message=f"The {sender.__name__} for '{instance.created_by}' has been updated."
         )
 
 @receiver(post_delete, sender=CourseActivity)
@@ -258,5 +258,5 @@ def log_activity_save(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=LessonActivity)
 def log_activity_delete(sender, instance, **kwargs):
     ActivityLog.objects.create(
-        message=f"The {sender.__name__} activity for '{instance.created_by}' has been deleted."
+        message=f"The {sender.__name__}  for '{instance.created_by}' has been deleted."
     )

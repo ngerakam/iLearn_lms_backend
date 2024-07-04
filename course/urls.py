@@ -3,7 +3,8 @@ from .views import (LearningPathListAPIView, LearningPathAPIView,
                     CategoryListAPIView, CategoryAPIView, CoursesListAPIView,
                     CoursesAPIView, ModuleListAPiView, ModuleAPiView,
                     LessonListAPIView, LessonAPIView, CommentListAPIView,
-                    CommentAPIView, EnrollmentListAPIView, ProgressListAPIView)
+                    CommentAPIView, EnrollmentListAPIView, ProgressListAPIView,
+                    EnrollmentAPIView)
 
 urlpatterns = [
     path('learning-paths/', LearningPathListAPIView.as_view()),
@@ -18,7 +19,9 @@ urlpatterns = [
     path('<str:course_slug>/modules/<str:mod_slug>/lessons/<str:lesson_slug>/', LessonAPIView.as_view()),
     path('<str:course_slug>/modules/<str:mod_slug>/lessons/<str:lesson_slug>/comments/', CommentListAPIView.as_view()),
     path('<str:course_slug>/modules/<str:mod_slug>/lessons/<str:lesson_slug>/comments/<str:pk>/', CommentAPIView.as_view()),
-    #Enrollment and Progress urls
+    #Enrollment urls
     path('<str:course_slug>/enrollments/', EnrollmentListAPIView.as_view()),
+    path('<str:course_slug>/enrollments/<str:pk>/', EnrollmentAPIView.as_view()),
+    #Progress urls
     path('<str:course_slug>/progress/', ProgressListAPIView.as_view()),
 ]

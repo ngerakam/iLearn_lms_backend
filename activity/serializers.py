@@ -1,23 +1,23 @@
-# from rest_framework import serializers
+from rest_framework import serializers
 
-# from .models import Activity,ScoreBoard ,Enrollment, CourseStatus
+from .models import CourseActivity, ModuleActivity, LessonActivity, ActivityLog
 
-# class ActivitySerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Activity
-#         fields = ('id', 'course', 'lesson', 'status')
+class CourseActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CourseActivity
+        fields = ('id','course', 'status', 'created_by')
 
-# class CourseStatusSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Activity
-#         fields = ('id', 'course', 'status')
+class ModuleActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ModuleActivity
+        fields = ('id', 'module','status', 'created_by')
 
-# class ScoreBoardSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = ScoreBoard
-#         fields = ('id', 'course', 'lesson', 'quiz','score', 'created_by')
+class LessonActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LessonActivity
+        fields = ('id', 'lesson','status', 'created_by')
 
-# class EnrollmentSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Enrollment
-#         fields = ('id', 'course', 'created_by')
+class ActivityLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ActivityLog
+        fields = ('id', 'message', 'created_at')

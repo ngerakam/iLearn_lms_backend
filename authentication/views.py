@@ -40,7 +40,7 @@ class RegisterAPIView(APIView):
         user.save()
 
         # Delay for 2 seconds
-        time.sleep(2)
+        # time.sleep(2)
 
         # Retrieve the user's profile
         profile, created = UserProfile.objects.get_or_create(user=user)
@@ -129,6 +129,24 @@ class UserProfileAPIView(APIView):
         
 class UserPasswordResetAPI(APIView):
     pass
+
+class UserLogoutAPI(APIView):
+    def post(self, request):
+        refresh_token = request.data.get('refresh_token')
+
+        if not refresh_token:
+            return Response({'error': 'Refresh token not provided.'},
+                             status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response({'message': 'Successfully logged out.'},
+                             status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': 'Failed to logout.', 'detail': str(e)},
+                             status=status.HTTP_400_BAD_REQUEST)
+
 class SiteSetupDetailAPIView(APIView):
     def get(self, request, *args, **kwargs):
         try:
@@ -137,7 +155,7 @@ class SiteSetupDetailAPIView(APIView):
                 return Response({"message": "Site setup not found"}, status=status.HTTP_404_NOT_FOUND)
             
             serializer = SiteSetupSerializer(site_setup)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         
         except Exception as e:
             return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)

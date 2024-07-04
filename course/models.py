@@ -124,12 +124,12 @@ class Lesson(models.Model):
         return None
 
 class Comment(models.Model):
-    lesson = models.ForeignKey(Lesson, related_name='comments', on_delete=models.CASCADE)
+    lesson = models.ForeignKey(Lesson, related_name='lesson_comments', on_delete=models.CASCADE)
     title = models.CharField(max_length=100)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, related_name='course_commentor',
+        settings.AUTH_USER_MODEL, related_name='lesson_commentor',
           on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
@@ -142,6 +142,9 @@ class Enrollment(models.Model):
     class Meta:
         unique_together = ('user', 'course')
 
+    def __str__(self):
+        return f"For: {self.user}, Course: {self.course}"
+
 class Progress(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     course = models.ForeignKey(Course, related_name='progresses', on_delete=models.CASCADE)
@@ -152,6 +155,9 @@ class Progress(models.Model):
 
     class Meta:
         unique_together = ('user', 'course')
+
+    def __str__(self):
+        return f"For: {self.user}, Course: {self.course}"
 
     @property
     def progress_percentage(self):
