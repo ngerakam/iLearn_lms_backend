@@ -27,6 +27,18 @@ class CourseActivityListAPIView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+class CourseActivityAPIView(APIView):
+    def get(self, request, course_slug):
+        try:
+            activities = CourseActivity.objects.filter(created_by=request.user,
+                                                        course__slug=course_slug)
+            serializer = CourseActivitySerializer(activities, many=False)
+
+            return Response({'data':serializer.data}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 class ModuleActivityListAPIView(APIView):
     def get(self, request):
         try:
@@ -55,6 +67,18 @@ class ModuleActivityListAPIView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+class ModuleActivityAPIView(APIView):
+    def get(self, request, mod_slug):
+        try:
+            modules = ModuleActivity.objects.filter(created_by=request.user,
+                                                     module__slug=mod_slug)
+            serializer = ModuleActivitySerializer(modules, many=False)
+
+            return Response({'data':serializer.data}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 class LessonActivityListAPIView(APIView):
     def get(self, request):
         try:
@@ -79,6 +103,18 @@ class LessonActivityListAPIView(APIView):
             serializer = LessonActivitySerializer(lesson_activity, many=False)
 
             return Response({'data':serializer.data},status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class LessonActivityAPIView(APIView):
+    def get(self, request, lesson_slug):
+        try:
+            lessons = LessonActivity.objects.filter(created_by=request.user,
+                                                    lesson__slug=lesson_slug)
+            serializer = LessonActivitySerializer(lessons, many=False)
+
+            return Response({'data':serializer.data}, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
