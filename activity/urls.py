@@ -3,7 +3,7 @@ from .views import (CourseActivityListAPIView, ModuleActivityListAPIView,
                     LessonActivityListAPIView, ActivityLogListAPIView,
                       CreatedCoursesListAPIView, UnpublishedCoursesListAPIView,
                        CompletedCoursesListAPIView, EnrolledCoursesListAPIView,
-                        FrontPageCoursesListAPIView )
+                        FrontPageCoursesListAPIView,    )
 
 urlpatterns = [
     path('courses/', CourseActivityListAPIView.as_view()),
@@ -16,5 +16,4 @@ urlpatterns = [
     path('courses/unpublished/', UnpublishedCoursesListAPIView.as_view()),
     path('courses/completed/', CompletedCoursesListAPIView.as_view()),
     path('courses/frontpage/', FrontPageCoursesListAPIView.as_view()),
-
 ]

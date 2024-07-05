@@ -5,17 +5,17 @@ from .models import CourseActivity, ModuleActivity, LessonActivity, ActivityLog
 class CourseActivitySerializer(serializers.ModelSerializer):
     class Meta:
         model = CourseActivity
-        fields = ('id','course', 'status', 'created_by')
+        fields = ('id','activity_course', 'status', 'created_by')
 
 class ModuleActivitySerializer(serializers.ModelSerializer):
     class Meta:
         model = ModuleActivity
-        fields = ('id', 'module','status', 'created_by')
+        fields = ('id', 'activity_module','status', 'created_by')
 
 class LessonActivitySerializer(serializers.ModelSerializer):
     class Meta:
         model = LessonActivity
-        fields = ('id', 'lesson','status', 'created_by')
+        fields = ('id', 'activity_lesson','status', 'created_by')
 
 class ActivityLogSerializer(serializers.ModelSerializer):
     class Meta:

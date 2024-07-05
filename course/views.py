@@ -270,6 +270,17 @@ class ModuleListAPiView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+class CourseStatusAPIView(APIView):
+    def get(self, request, course_slug):
+        try:
+            course = Course.objects.get(slug=course_slug)
+            serializer = CourseDetailStatusSerializer(course, many=False)
+
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 class  ModuleAPiView(APIView):
     def get(self, request, course_slug, mod_slug):
         try:

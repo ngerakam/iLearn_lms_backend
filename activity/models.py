@@ -13,40 +13,40 @@ STATUS_CHOICES = (
 )
 
 class CourseActivity(models.Model):
-    course = models.ForeignKey('course.Course', related_name='course_activities', on_delete=models.CASCADE)
+    activity_course = models.ForeignKey('course.Course', related_name='course_activities', on_delete=models.CASCADE)
     status =  models.CharField(max_length=20, choices=STATUS_CHOICES, default=NONE)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='course_activities', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name_plural = 'CourseActivities'
-        unique_together = ('course', 'created_by')
+        unique_together = ('activity_course', 'created_by')
 
     def __str__(self):
         return f"For: {self.created_by}, Course: {self.course}, Status: {self.status}"
 
 class ModuleActivity(models.Model):
-    module = models.ForeignKey('course.Module', related_name='module_activities', on_delete=models.CASCADE)
+    activity_module = models.ForeignKey('course.Module', related_name='module_activities', on_delete=models.CASCADE)
     status =  models.CharField(max_length=20, choices=STATUS_CHOICES, default=NONE)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='module_activities', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name_plural = 'ModuleActivities'
-        unique_together = ('module', 'created_by')
+        unique_together = ('activity_module', 'created_by')
 
     def __str__(self):
         return f"For: {self.created_by}, Course: {self.module}, Status: {self.status}"
 
 class LessonActivity(models.Model):
-    lesson = models.ForeignKey('course.Lesson', related_name='lesson_activities', on_delete=models.CASCADE)
+    activity_lesson = models.ForeignKey('course.Lesson', related_name='lesson_activities', on_delete=models.CASCADE)
     status =  models.CharField(max_length=20, choices=STATUS_CHOICES, default=NONE)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='lesson_activities', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name_plural = 'LessonActivities'
-        unique_together = ('lesson', 'created_by')
+        unique_together = ('activity_lesson', 'created_by')
 
     def __str__(self):
         return f"For: {self.created_by}, Lesson: {self.lesson}, Status: {self.status}"
