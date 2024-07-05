@@ -71,8 +71,4 @@ def send_user_registration_email(sender, instance, created, **kwargs):
 
         #for the manager python manage.py createsuperuser
         if instance.is_superuser:
-            userprofile = UserProfile.objects.get(user=instance)
-            if userprofile:
-                return
-            else:
-                UserProfile.objects.create(user=instance)
+            userprofile = UserProfile.objects.get_or_create(user=instance)

@@ -11,9 +11,12 @@ class LessonAdmin(admin.ModelAdmin):
     search_fields = ['title', 'short_description', 'long_description']
     inlines = [LessonCommentInline]
 
+class CourseAdmin(admin.ModelAdmin):
+    list_display = ['title',  'status', 'created_by']
+
 admin.site.register(LearningPath)
 admin.site.register(Category)
-admin.site.register(Course)
+admin.site.register(Course,CourseAdmin)
 admin.site.register(Module)
 admin.site.register(Lesson, LessonAdmin)
 admin.site.register(Comment)
