@@ -1,4 +1,4 @@
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly,AllowAny
 from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
@@ -280,6 +280,18 @@ class CourseStatusAPIView(APIView):
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+class CourseNoAuthAPIView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    def get(self, request, course_slug):
+        try:
+            course = Course.objects.get(slug=course_slug)
+            serializer = CourseDetailSerializer(course, many=False)
+
+            return Response({'data':serializer.data},status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class  ModuleAPiView(APIView):
     def get(self, request, course_slug, mod_slug):
@@ -386,10 +398,28 @@ class LessonAPIView(APIView):
     def put(self,request, course_slug, mod_slug,lesson_slug):
         data = request.data
         try:
+            lesson_type = data.get('lesson_type')
             lesson = Lesson.objects.get(module__slug=mod_slug, slug=lesson_slug)
             lesson.title = data.get('title')
-            lesson.description = data.get('description')
-            lesson.is_open = data.get('is_open')
+            lesson.short_description = data.get('short_description')
+            lesson.status = data.get('status')
+            if lesson_type == 'article':
+                lesson.lesson_type = 'article'
+                lesson.long_description = data.get('long_description')
+            elif lesson_type == 'video':
+                lesson.lesson_type = 'video'
+                video_file = data.get('video')
+                if video_file:
+                    lesson.video = video_file
+                else:
+                    lesson.youtube_id = data.get('youtube_id')
+            elif lesson_type == 'file':
+                lesson.lesson_type = 'file'
+                document_file = request.data.get('document')
+                if document_file:
+                    lesson.file = document_file
+            elif lesson_type == 'quiz':
+                pass
             lesson.save()
             serializer = LessonSerializer(lesson, many=False)
 
@@ -503,6 +533,7 @@ class EnrollmentListAPIView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class EnrollmentAPIView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
     def get(self, request, course_slug, pk=None):
         try:
             enrollment = Enrollment.objects.get(pk=pk,course__slug=course_slug)

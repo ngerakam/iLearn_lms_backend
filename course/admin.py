@@ -14,10 +14,13 @@ class LessonAdmin(admin.ModelAdmin):
 class CourseAdmin(admin.ModelAdmin):
     list_display = ['title',  'status', 'created_by']
 
+class ModuleAdmin(admin.ModelAdmin):
+    list_display = ['title',  'is_open', 'course']
+
 admin.site.register(LearningPath)
 admin.site.register(Category)
 admin.site.register(Course,CourseAdmin)
-admin.site.register(Module)
+admin.site.register(Module,ModuleAdmin)
 admin.site.register(Lesson, LessonAdmin)
 admin.site.register(Comment)
 admin.site.register(Enrollment)

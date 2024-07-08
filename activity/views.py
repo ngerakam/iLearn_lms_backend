@@ -1,6 +1,6 @@
 from django.db.models import Q
 
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated, IsAdminUser, IsAuthenticatedOrReadOnly
 from rest_framework.exceptions import NotFound
 from rest_framework.views import APIView
 from rest_framework.generics import ListAPIView
@@ -94,9 +94,49 @@ class ActivityLogListAPIView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+class CourseActivityAPIView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    def get(self, request, course_slug):
+        try:
+            course = Course.objects.get(slug=course_slug)
+            activity = CourseActivity.objects.get(
+                activity_course=course,created_by=request.user)
+            serializer = CourseActivitySerializer(activity, many=False)
 
+            return Response({'data':serializer.data}, status=status.HTTP_200_OK)
 
-##############  Custome Views ##############################
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class ModuleActivityAPIView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    def get(self, request, mod_slug):
+        try:
+            module = Module.objects.get(slug=mod_slug)
+            activity = ModuleActivity.objects.filter(
+                activity_module=module,created_by=request.user)
+            serializer = ModuleActivitySerializer(activity, many=False)
+
+            return Response({'data':serializer.data}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class LessonActivityAPIView(APIView):
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    def get(self, request, lesson_slug):
+        try:
+            lesson = Lesson.objects.get(slug=lesson_slug)
+            activity = LessonActivity.objects.filter(
+                activity_lesson=lesson,created_by=request.user)
+            serializer = LessonActivitySerializer(activity, many=False)
+
+            return Response({'data':serializer.data}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+##############  Custom Views ##############################
 
 class CreatedCoursesListAPIView(APIView):
     def get(self, request):
@@ -140,7 +180,9 @@ class CompletedCoursesListAPIView(APIView):
 class EnrolledCoursesListAPIView(APIView):
     def get(self, request):
         try:
-            enrollments = Enrollment.objects.filter(user=request.user)
+            user = request.user
+            enrollments = Enrollment.objects.filter(user=user).select_related('course')
+            print(enrollments)
             courses = [enrollment.course for enrollment in enrollments]
             serializer = CourseSerializer(courses, many=True)
 

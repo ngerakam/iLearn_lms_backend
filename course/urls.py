@@ -4,7 +4,7 @@ from .views import (LearningPathListAPIView, LearningPathAPIView,
                     CoursesAPIView, ModuleListAPiView, ModuleAPiView,
                     LessonListAPIView, LessonAPIView, CommentListAPIView,
                     CommentAPIView, EnrollmentListAPIView, ProgressListAPIView,
-                    EnrollmentAPIView, CourseStatusAPIView)
+                    EnrollmentAPIView, CourseStatusAPIView, CourseNoAuthAPIView)
 
 urlpatterns = [
     path('learning-paths/', LearningPathListAPIView.as_view()),
@@ -14,6 +14,7 @@ urlpatterns = [
     path('', CoursesListAPIView.as_view()),
     path('<str:course_slug>/', CoursesAPIView.as_view()),
     path('<str:course_slug>/status/', CourseStatusAPIView.as_view()),
+    path('<str:course_slug>/no-auth/', CourseNoAuthAPIView.as_view()),
     path('<str:course_slug>/modules/', ModuleListAPiView.as_view()),
     path('<str:course_slug>/modules/<str:mod_slug>/', ModuleAPiView.as_view()),
     path('<str:course_slug>/modules/<str:mod_slug>/lessons/', LessonListAPIView.as_view()),
