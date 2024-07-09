@@ -26,17 +26,7 @@ class QuizListAPIView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)   
 
-class QuizRetriveAPIView(APIView):
-    def get(self,request,course_slug,quiz_slug):
-        try:
-            quiz = Quiz.objects.get(course__slug=course_slug, slug=quiz_slug)
-            serializer = QuizSerializer(quiz, many=False)
-
-            return Response(serializer.data)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
-    def post(self,request,course_slug,quiz_slug):
+    def post(self,request,course_slug):
         data = request.data
         try:
             course = Course.objects.get(slug=course_slug)
@@ -55,6 +45,15 @@ class QuizRetriveAPIView(APIView):
             )
             quiz.save()
             serializer = QuizSerializer(quiz, many=False)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+class QuizRetriveAPIView(APIView):
+    def get(self,request,course_slug,quiz_slug):
+        try:
+            quiz = Quiz.objects.get(course__slug=course_slug, slug=quiz_slug)
+            serializer = QuizSerializer(quiz, many=False)
+
             return Response(serializer.data)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -100,6 +99,19 @@ class QuestionListAPIView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+    def post(self,request,course_slug,quiz_slug,pk=None):
+        data = request.data
+        try:
+            quiz = Quiz.objects.get(course__slug=course_slug, slug=quiz_slug)
+            question = Question.objects.create(
+                quiz=quiz,
+                question_type=data.get('question_type'),
+                text = data.get('text'),
+                marks = data.get('marks')
+            )
+            question.save()
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 class QuestionDetailAPIView(APIView):
     def get(self,request,course_slug,quiz_slug,pk=None):
         try:
@@ -110,7 +122,7 @@ class QuestionDetailAPIView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
-    def post(self,request,course_slug,quiz_slug,pk=None):
+    def put(self,request,course_slug,quiz_slug,pk=None):
         data = request.data
         try:
             quiz = Quiz.objects.get(course__slug=course_slug, slug=quiz_slug)
@@ -125,21 +137,7 @@ class QuestionDetailAPIView(APIView):
             return Response(serializer.data)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
-    def put(self,request,course_slug,quiz_slug,pk=None):
-        data = request.data
-        try:
-            quiz = Quiz.objects.get(course__slug=course_slug, slug=quiz_slug)
-            question = Question.objects.create(
-                quiz=quiz,
-                question_type=data.get('question_type'),
-                text = data.get('text'),
-                marks = data.get('marks')
-            )
-            question.save()
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
+
     def delete(self,request,course_slug,quiz_slug,pk=None):
         try:
             quiz = Quiz.objects.get(course__slug=course_slug, slug=quiz_slug)

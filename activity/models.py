@@ -36,7 +36,7 @@ class ModuleActivity(models.Model):
         unique_together = ('activity_module', 'created_by')
 
     def __str__(self):
-        return f"For: {self.created_by}, Course: {self.activity_module}, Status: {self.status}"
+        return f"For: {self.created_by}, Module: {self.activity_module}, Status: {self.status}"
 
 class LessonActivity(models.Model):
     activity_lesson = models.ForeignKey('course.Lesson', related_name='lesson_activities', on_delete=models.CASCADE)

@@ -9,7 +9,7 @@ urlpatterns = [
     path('api/v1/courses/', include('course.urls')),
     path('api/v1/activities/', include('activity.urls')),
     path('api/v1/statistics/', include('stats.urls')),
-    # path('api/v1/quiz/', include('quiz.urls')),
+    path('api/v1/quiz/', include('quiz.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 
