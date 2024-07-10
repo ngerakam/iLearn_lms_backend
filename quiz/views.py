@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -22,18 +23,18 @@ class QuizListAPIView(APIView):
             quizzes = course.quizzes.all()
             serializer = QuizSerializer(quizzes, many=True)
 
-            return Response(serializer.data)
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)   
 
     def post(self,request,course_slug):
         data = request.data
+        print(data)
         try:
             course = Course.objects.get(slug=course_slug)
             quiz = Quiz.objects.create(
                 course=course,
                 title=data.get('title'),
-                slug=data.get('slug'),
                 description=data.get('description'),
                 category=data.get('category'),
                 random_order = data.get('random_order'),
@@ -45,7 +46,7 @@ class QuizListAPIView(APIView):
             )
             quiz.save()
             serializer = QuizSerializer(quiz, many=False)
-            return Response(serializer.data)
+            return Response({"data":serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 class QuizRetriveAPIView(APIView):
@@ -54,7 +55,7 @@ class QuizRetriveAPIView(APIView):
             quiz = Quiz.objects.get(course__slug=course_slug, slug=quiz_slug)
             serializer = QuizSerializer(quiz, many=False)
 
-            return Response(serializer.data)
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
@@ -75,6 +76,8 @@ class QuizRetriveAPIView(APIView):
             data.pass_mark = data.get('pass_mark')
             data.draft = data.get('draft')
             quiz.save()
+            serializer = QuizSerializer(quiz, many=False)
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -95,7 +98,7 @@ class QuestionListAPIView(APIView):
             quiz = Quiz.objects.get(course__slug=course_slug, slug=quiz_slug)
             questions = quiz.questions.all()
             serializer = QuestionSerializer(questions, many=True)
-            return Response(serializer.data)
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -110,6 +113,8 @@ class QuestionListAPIView(APIView):
                 marks = data.get('marks')
             )
             question.save()
+            serializer = QuestionSerializer(question, many=False)
+            return Response({"data":serializer.data}, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 class QuestionDetailAPIView(APIView):
@@ -118,7 +123,7 @@ class QuestionDetailAPIView(APIView):
             quiz = Quiz.objects.get(course__slug=course_slug, slug=quiz_slug)
             question = Question.objects.get(pk=pk,quiz=quiz)
             serializer = QuestionSerializer(question, many=False)
-            return Response(serializer.data)
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
@@ -134,7 +139,7 @@ class QuestionDetailAPIView(APIView):
             question.save()
             serializer = QuestionSerializer(question, many=False)
 
-            return Response(serializer.data)
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -150,49 +155,323 @@ class QuestionDetailAPIView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)        
 
 class MultipleChoiceQuestionListAPIView(APIView):
-    queryset = MultipleChoiceQuestion.objects.all()
-    serializer_class = MultipleChoiceQuestionSerializer
+    def get(self,request,course_slug,quiz_slug,pk=None):
+        try:
+            question = Question.objects.get(pk=pk,quiz__slug=quiz_slug)
+            mtp_questions = question.multiple_choice_question.all()
+            serializer = MultipleChoiceQuestionSerializer(mtp_questions, many=True)
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def post(self,request,course_slug,quiz_slug,pk=None):
+        try:
+            question = Question.objects.get(pk=pk,quiz__slug=quiz_slug)
+            mtp_question = MultipleChoiceQuestion.objects.create(
+                question = question,
+                is_many_answers = request.data.get("is_many_answers"),
+                choice_order = request.data.get("choice_order")
+            )
+            mtp_question.save()
+            serializer = MultipleChoiceQuestionSerializer(mtp_question, many=False)
+            return Response({"data":serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)       
+
 
 class MultipleChoiceQuestionDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = MultipleChoiceQuestion.objects.all()
     serializer_class = MultipleChoiceQuestionSerializer
 
+    def get_object(self):
+        course = get_object_or_404(Course, slug=self.kwargs['course_slug'])
+        quiz = get_object_or_404(Quiz, slug=self.kwargs['quiz_slug'], course=course)
+        question = get_object_or_404(Question, id=self.kwargs['question_pk'], quiz=quiz)
+        return get_object_or_404(MultipleChoiceQuestion, id=self.kwargs['mtp_pk'], question=question)
+
+    def get(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+
+    def put(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_many_answers = request.data.get("is_many_answers", instance.is_many_answers)
+        instance.choice_order = request.data.get("choice_order", instance.choice_order)
+        instance.save()
+        serializer = self.get_serializer(instance)
+        return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+
+    def delete(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 class MultipleChoiceQuestionsOptionsListCreateView(generics.ListCreateAPIView):
-    queryset = MultipleChoiceQuestionsOptions.objects.all()
-    serializer_class = MultipleChoiceQuestionsOptionsSerializer
+    def get(self,request,course_slug,quiz_slug,question_pk=None,mtp_pk=None):
+        try:
+            mtp_question = MultipleChoiceQuestion.objects.get(question__id=question_pk, pk=mtp_pk)
+            mtp_options = mtp_question.options.all()
+            serializer = MultipleChoiceQuestionsOptionsSerializer(mtp_options, many=True)
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def post(self, request, course_slug, quiz_slug, question_pk=None, mtp_pk=None):
+        try:
+            mtp_question = MultipleChoiceQuestion.objects.get(question__id=question_pk, pk=mtp_pk)
+            mtp_option = MultipleChoiceQuestionsOptions.objects.create(
+                mtp_question = mtp_question,
+                option = request.data.get("option"),
+                correct_option = request.data.get("correct_option")
+            )
+            mtp_option.save()
+            serializer = MultipleChoiceQuestionsOptionsSerializer(mtp_option, many=False)
+            return Response({"data":serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class MultipleChoiceQuestionsOptionsDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = MultipleChoiceQuestionsOptions.objects.all()
     serializer_class = MultipleChoiceQuestionsOptionsSerializer
 
+    def get_object(self):
+        course = get_object_or_404(Course, slug=self.kwargs['course_slug'])
+        quiz = get_object_or_404(Quiz, slug=self.kwargs['quiz_slug'], course=course)
+        question = get_object_or_404(Question, id=self.kwargs['question_pk'], quiz=quiz)
+        mtp_question = get_object_or_404(MultipleChoiceQuestion,
+                                          id=self.kwargs['mtp_pk'], question=question)
+        return get_object_or_404(MultipleChoiceQuestionsOptions,
+                                  id=self.kwargs['mtpo_pk'], mtp_question=mtp_question)
+
+    def get(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+
+    def put(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.option = request.data.get("option", instance.option)
+        instance.correct_option = request.data.get("correct_option", instance.correct_option)
+        instance.save()
+        serializer = self.get_serializer(instance)
+        return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+
+    def delete(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 class TrueFalseQuestionListCreateView(generics.ListCreateAPIView):
-    queryset = TrueFalseQuestion.objects.all()
-    serializer_class = TrueFalseQuestionSerializer
+    def get(self,request,course_slug,quiz_slug,pk=None):
+        try:
+            question = Question.objects.get(pk=pk,quiz__slug=quiz_slug)
+            questions = question.true_false_question.all()
+            serializer = TrueFalseQuestionSerializer(questions, many=True)
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def post(self,request,course_slug,quiz_slug,pk=None):
+        try:
+            question = Question.objects.get(pk=pk,quiz__slug=quiz_slug)
+            tf_question = TrueFalseQuestion.objects.create(
+                question = question,
+                correct_answer = request.data.get("correct_answer"),
+            )
+            tf_question.save()
+            serializer = TrueFalseQuestionSerializer(tf_question, many=False)
+            return Response({"data":serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST) 
 
 class TrueFalseQuestionDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = TrueFalseQuestion.objects.all()
     serializer_class = TrueFalseQuestionSerializer
 
+    def get_object(self):
+        course = get_object_or_404(Course, slug=self.kwargs['course_slug'])
+        quiz = get_object_or_404(Quiz, slug=self.kwargs['quiz_slug'], course=course)
+        question = get_object_or_404(Question, id=self.kwargs['question_pk'], quiz=quiz)
+        return get_object_or_404(TrueFalseQuestion,
+                                          id=self.kwargs['tf_pk'], question=question)
+
+    def get(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+
+    def put(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.correct_answer = request.data.get("correct_answer", instance.correct_answer)
+        instance.save()
+        serializer = self.get_serializer(instance)
+        return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+
+    def delete(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 class EssayQuestionListCreateView(generics.ListCreateAPIView):
-    queryset = EssayQuestion.objects.all()
-    serializer_class = EssayQuestionSerializer
+    def get(self,request,course_slug,quiz_slug,pk=None):
+        try:
+            question = Question.objects.get(pk=pk,quiz__slug=quiz_slug)
+            questions = question.essay_question.all()
+            serializer = EssayQuestionSerializer(questions, many=True)
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def post(self,request,course_slug,quiz_slug,pk=None):
+        try:
+            question = Question.objects.get(pk=pk,quiz__slug=quiz_slug)
+            essy_question = EssayQuestion.objects.create(
+                question = question,
+                sample_answer = request.data.get("sample_answer"),
+            )
+            essy_question.save()
+            serializer = EssayQuestionSerializer(essy_question, many=False)
+            return Response({"data":serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class EssayQuestionDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = EssayQuestion.objects.all()
     serializer_class = EssayQuestionSerializer
 
+    def get_object(self):
+        course = get_object_or_404(Course, slug=self.kwargs['course_slug'])
+        quiz = get_object_or_404(Quiz, slug=self.kwargs['quiz_slug'], course=course)
+        question = get_object_or_404(Question, id=self.kwargs['question_pk'], quiz=quiz)
+        return get_object_or_404(EssayQuestion,
+                                          id=self.kwargs['essay_pk'], question=question)
+
+    def get(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+
+    def put(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.sample_answer = request.data.get("sample_answer", instance.sample_answer)
+        instance.save()
+        serializer = self.get_serializer(instance)
+        return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+
+    def delete(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 class EssayQuestionAnswerListCreateView(generics.ListCreateAPIView):
-    queryset = EssayQuestionAnswer.objects.all()
-    serializer_class = EssayQuestionAnswerSerializer
+    def get(self,request,course_slug,quiz_slug,question_pk=None,essay_pk=None):
+        try:
+            eassy_question = EssayQuestion.objects.get(question__id=question_pk, pk=essay_pk)
+            eassy_question_answer = eassy_question.essay_answers.all()
+            serializer = EssayQuestionAnswerSerializer(eassy_question_answer, many=True)
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def post(self, request, course_slug, quiz_slug, question_pk=None, essay_pk=None):
+        try:
+            eassy_question = EssayQuestion.objects.get(question__id=question_pk, pk=essay_pk)
+            eassy_question_answer = EssayQuestionAnswer.objects.create(
+                essay_question = eassy_question,
+                is_correct = request.data.get("is_correct"),
+                text = request.data.get("text")
+            )
+            eassy_question_answer.save()
+            serializer = EssayQuestionAnswerSerializer(eassy_question_answer, many=False)
+            return Response({"data":serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 class EssayQuestionAnswerDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = EssayQuestionAnswer.objects.all()
     serializer_class = EssayQuestionAnswerSerializer
 
-class UserQuizSessionListCreateView(generics.ListCreateAPIView):
-    queryset = UserQuizSession.objects.all()
-    serializer_class = UserQuizSessionSerializer
+    def get_object(self):
+        course = get_object_or_404(Course, slug=self.kwargs['course_slug'])
+        quiz = get_object_or_404(Quiz, slug=self.kwargs['quiz_slug'], course=course)
+        question = get_object_or_404(Question, id=self.kwargs['question_pk'], quiz=quiz)
+        essay_question = get_object_or_404(EssayQuestion,
+                                          id=self.kwargs['essay_pk'], question=question)
+        return get_object_or_404(EssayQuestionAnswer,
+                                  id=self.kwargs['essay_ans_pk'], essay_question=essay_question)
 
-class UserQuizSessionDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = UserQuizSession.objects.all()
-    serializer_class = UserQuizSessionSerializer
+    def get(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+
+    def put(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.option = request.data.get("option", instance.option)
+        instance.correct_option = request.data.get("correct_option", instance.correct_option)
+        instance.save()
+        serializer = self.get_serializer(instance)
+        return Response({"data": serializer.data}, status=status.HTTP_200_OK)
+
+    def delete(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+class UserQuizSessionListCreateView(APIView):
+    def get(self,request,course_slug,quiz_slug):
+        try:
+            quiz = Quiz.objects.get(course__slug=course_slug, slug=quiz_slug)
+            sessions = quiz.sessions.all()
+            serializer = UserQuizSessionSerializer(sessions, many=True)
+
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST) 
+
+    def post(self,request,course_slug,quiz_slug):
+        data = request.data
+        print(data)
+        try:
+            quiz = Quiz.objects.get(course__slug=course_slug, slug=quiz_slug)
+            session = UserQuizSession.objects.create(
+                quiz=quiz,
+                start=data.get('start'),
+                end=data.get('end'),
+                users = data.get('users')
+            )
+            session.save()
+            serializer = UserQuizSession(session, many=False)
+            return Response({"data":serializer.data}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class UserQuizSessionDetailView(APIView):
+    def get(self,request,course_slug,quiz_slug,session_pk):
+        try:
+            session = UserQuizSession.objects.get(quiz__slug=quiz_slug, pk=session_pk)
+            serializer = UserQuizSessionSerializer(session, many=False)
+
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def put(self,request,course_slug,quiz_slug,session_pk):
+        data = request.data
+        try:
+            session = UserQuizSession.objects.get(quiz__slug=quiz_slug, pk=session_pk)
+            session.start=data.get('start'),
+            session.end=data.get('end'),
+            session.users = data.get('users')
+            session.save()
+            serializer = UserQuizSessionSerializer(session, many=False)
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self,request,course_slug,quiz_slug,session_pk):
+        try:
+            session = UserQuizSession.objects.get(quiz__slug=quiz_slug, pk=session_pk)
+            session.delete()
+            return Response({
+            "message":f"The Session for: {session.quiz.title} is deleted successfully",
+        })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

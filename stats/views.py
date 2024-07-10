@@ -71,7 +71,8 @@ class TotalUserCourses(APIView):
             })
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
+
+
 class CourseCompletionActivitiesView(APIView):
     def get(self, request, pk=None):
         try:
@@ -80,8 +81,35 @@ class CourseCompletionActivitiesView(APIView):
             
             user_ids = CourseActivity.objects.filter(activity_course=course).values_list('created_by_id', flat=True).distinct()
             
-            completed_users = []
-            
+            module_data = []
+
+            for module in modules:
+                lessons = module.lessons.all()
+                completed_users_count = 0
+                lessons_data = []
+
+                for lesson in lessons:
+                    completed_users = LessonActivity.objects.filter(
+                        activity_lesson=lesson,
+                        status='done'
+                    ).values('created_by__id', 'created_by__first_name', 'created_by__last_name', 'created_at').distinct()
+
+                    lessons_data.append({
+                        'id': lesson.id,
+                        'title': lesson.title,
+                        'completed_users': list(completed_users),
+                    })
+                    
+                    completed_users_count += completed_users.count()
+                
+                module_data.append({
+                    'id': module.id,
+                    'title': module.title,
+                    'completed_users_count': completed_users_count,
+                    'lessons': lessons_data,
+                })
+
+            # Check if all modules and lessons are completed by each user
             for user_id in user_ids:
                 user = User.objects.get(pk=user_id)
                 all_modules_completed = True
@@ -90,7 +118,7 @@ class CourseCompletionActivitiesView(APIView):
                     lessons = module.lessons.all()
                     all_lessons_completed = all(
                         LessonActivity.objects.filter(
-                            activity_lesson__module=module,
+                            activity_lesson=lesson,
                             status='done',
                             created_by=user
                         ).exists() for lesson in lessons
@@ -111,7 +139,6 @@ class CourseCompletionActivitiesView(APIView):
                         all_modules_completed = False
                 
                 if all_modules_completed:
-                    completed_users.append(user)
                     CourseActivity.objects.update_or_create(
                         activity_course=course,
                         created_by=user,
@@ -123,20 +150,68 @@ class CourseCompletionActivitiesView(APIView):
                         created_by=user,
                         defaults={'status': 'started'}
                     )
-            
-            completed_course_activities = CourseActivity.objects.filter(
-                activity_course=course, status='done')
-            completed_serializer = CourseActivitySerializer(
-                completed_course_activities, many=True)
-            
-            module_serializer = CustomModuleSerializer(modules, many=True)
 
-            
             return Response({
-                "completed_courses": completed_serializer.data,
-                "modules": module_serializer.data,
+                'course': {
+                    'id': course.id,
+                    'title': course.title,
+                    'short_description': course.short_description,
+                    'get_image': course.get_image(),
+                    'modules': module_data,
+                }
             }, status=status.HTTP_200_OK)
-        
+
+        except Course.DoesNotExist:
+            return Response({'error': 'Course not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+class CourseActivitiesView(APIView):
+    def get(self, request, pk=None):
+        try:
+            course = Course.objects.get(pk=pk)
+            modules = course.modules.all()
+            
+            module_data = []
+
+            for module in modules:
+                lessons = module.lessons.all()
+                lessons_data = []
+
+                for lesson in lessons:
+                    lesson_activities = LessonActivity.objects.filter(activity_lesson=lesson)
+                    completed_users = lesson_activities.filter(status='done').values(
+                        'created_by__id', 'created_by__first_name', 'created_by__last_name', 'created_at'
+                    ).distinct()
+
+                    lessons_data.append({
+                        'id': lesson.id,
+                        'title': lesson.title,
+                        'completed_users': list(completed_users),
+                        'status': lesson_activities.values('status').first()['status'] if lesson_activities.exists() else None
+                    })
+                
+                module_status = ModuleActivity.objects.filter(activity_module=module).values('status').first()
+                module_data.append({
+                    'id': module.id,
+                    'title': module.title,
+                    'completed_users_count': sum(1 for lesson in lessons_data if lesson['status'] == 'done'),
+                    'lessons': lessons_data,
+                    'status': module_status['status'] if module_status else None
+                })
+
+            course_status = CourseActivity.objects.filter(activity_course=course).values('status').first()
+
+            return Response({
+                'course': {
+                    'id': course.id,
+                    'title': course.title,
+                    'short_description': course.short_description,
+                    'get_image': course.get_image(),
+                    'modules': module_data,
+                    'status': course_status['status'] if course_status else None
+                }
+            }, status=status.HTTP_200_OK)
+
         except Course.DoesNotExist:
             return Response({'error': 'Course not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:

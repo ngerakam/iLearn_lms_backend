@@ -102,10 +102,14 @@ class EssayQuestion(models.Model):
         return f"Question {self.question.text} for quiz {self.sample_answer}"
 
 class EssayQuestionAnswer(models.Model):
-    essay_question = models.ForeignKey(EssayQuestion, related_name='essay_answers', on_delete=models.CASCADE)
+    essay_question = models.ForeignKey(EssayQuestion, related_name='essay_answers',
+                                        on_delete=models.CASCADE)
     is_correct = models.BooleanField()
     text = models.TextField()
-
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL,
+                                    related_name='essay_answers', on_delete=models.CASCADE)
+    class Meta:
+        unique_together=('created_by','essay_question')
     def __str__(self):
         return f"Question {self.essay_question.question.text} for answer {self.text}"
 
@@ -115,7 +119,7 @@ class UserQuizSession(models.Model):
     question_order = models.CharField(max_length=30, choices=CHOICE_ORDER_OPTIONS, blank=True, null=True)
     question_list = models.CharField(max_length=1024, validators=[validate_comma_separated_integer_list])
     incorrect_questions = models.CharField(max_length=1024, blank=True, validators=[validate_comma_separated_integer_list])
-    current_score = models.IntegerField()
+    current_score = models.IntegerField(default=0)
     complete = models.BooleanField(default=False)
     user_answers = models.TextField(blank=True, default="{}")
     take_time = models.DurationField(null=True, blank=True)
