@@ -82,7 +82,7 @@ class MultipleChoiceQuestion(models.Model):
 class MultipleChoiceQuestionsOptions(models.Model):
     mtp_question = models.ForeignKey(MultipleChoiceQuestion, related_name='options', on_delete=models.CASCADE)
     option = models.CharField(max_length=255, blank=True, null=True)
-    correct_option = models.BooleanField()
+    correct_option = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Multiple Question {self.mtp_question.question.text} for Multiple answer {self.option} correct? {self.correct_option}"
@@ -123,8 +123,8 @@ class UserQuizSession(models.Model):
     complete = models.BooleanField(default=False)
     user_answers = models.TextField(blank=True, default="{}")
     take_time = models.DurationField(null=True, blank=True)
-    start = models.TimeField(null=True, blank=True)
-    end = models.TimeField(null=True, blank=True)
+    start = models.DateTimeField(null=True, blank=True)
+    end = models.DateTimeField(null=True, blank=True)
     grade = models.FloatField(blank=True, null=True)
 
     class Meta:

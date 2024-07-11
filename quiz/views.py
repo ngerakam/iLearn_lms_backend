@@ -158,7 +158,7 @@ class MultipleChoiceQuestionListAPIView(APIView):
     def get(self,request,course_slug,quiz_slug,pk=None):
         try:
             question = Question.objects.get(pk=pk,quiz__slug=quiz_slug)
-            mtp_questions = question.multiple_choice_question.all()
+            mtp_questions = MultipleChoiceQuestion.objects.filter(question=question)
             serializer = MultipleChoiceQuestionSerializer(mtp_questions, many=True)
             return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         except Exception as e:
@@ -206,11 +206,11 @@ class MultipleChoiceQuestionDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-class MultipleChoiceQuestionsOptionsListCreateView(generics.ListCreateAPIView):
+class MultipleChoiceQuestionsOptionsListCreateView(APIView):
     def get(self,request,course_slug,quiz_slug,question_pk=None,mtp_pk=None):
         try:
             mtp_question = MultipleChoiceQuestion.objects.get(question__id=question_pk, pk=mtp_pk)
-            mtp_options = mtp_question.options.all()
+            mtp_options = MultipleChoiceQuestionsOptions.objects.filter(mtp_question=mtp_question)
             serializer = MultipleChoiceQuestionsOptionsSerializer(mtp_options, many=True)
             return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         except Exception as e:
@@ -261,11 +261,11 @@ class MultipleChoiceQuestionsOptionsDetailView(generics.RetrieveUpdateDestroyAPI
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-class TrueFalseQuestionListCreateView(generics.ListCreateAPIView):
+class TrueFalseQuestionListCreateView(APIView):
     def get(self,request,course_slug,quiz_slug,pk=None):
         try:
             question = Question.objects.get(pk=pk,quiz__slug=quiz_slug)
-            questions = question.true_false_question.all()
+            questions = TrueFalseQuestion.objects.filter(question=question)
             serializer = TrueFalseQuestionSerializer(questions, many=True)
             return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         except Exception as e:
@@ -315,7 +315,7 @@ class EssayQuestionListCreateView(generics.ListCreateAPIView):
     def get(self,request,course_slug,quiz_slug,pk=None):
         try:
             question = Question.objects.get(pk=pk,quiz__slug=quiz_slug)
-            questions = question.essay_question.all()
+            questions = EssayQuestion.objects.filter(question=question)
             serializer = EssayQuestionSerializer(questions, many=True)
             return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         except Exception as e:
@@ -365,7 +365,7 @@ class EssayQuestionAnswerListCreateView(generics.ListCreateAPIView):
     def get(self,request,course_slug,quiz_slug,question_pk=None,essay_pk=None):
         try:
             eassy_question = EssayQuestion.objects.get(question__id=question_pk, pk=essay_pk)
-            eassy_question_answer = eassy_question.essay_answers.all()
+            eassy_question_answer = EssayQuestionAnswer.objects.filter(essay_question=eassy_question)
             serializer = EssayQuestionAnswerSerializer(eassy_question_answer, many=True)
             return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         except Exception as e:
