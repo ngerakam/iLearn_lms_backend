@@ -178,11 +178,23 @@ class CoursesListAPIView(ListAPIView):
                 short_description = data.get('short_description'),
                 long_description = data.get('long_description')
             )
-            if 'categories' in data:
-                category_ids = data['categories']
-                for category_id in category_ids:
-                    category = Category.objects.get(id=category_id)
-                    course.categories.add(category)
+            # Handle categories
+            category_ids = data.getlist('categories[]')
+            for category_id in category_ids:
+                category = Category.objects.get(id=category_id)
+                course.categories.add(category)
+                # print("For Category")
+                # print(category)
+                # print(course)
+            
+            # Handle learning path
+            learning_path_id = data.get('learning_path')
+            if learning_path_id:
+                learning_path = LearningPath.objects.get(id=learning_path_id)
+                course.learning_path = learning_path
+                # print("For Learning Path")
+                # print(learning_path)
+                # print(course)
             image_file = data.get('image')
             if image_file:
                 course.image.save(image_file.name, image_file)

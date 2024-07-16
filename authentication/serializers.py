@@ -24,6 +24,11 @@ class ProfileUserSerializer(serializers.ModelSerializer):
         model = UserProfile
         fields  = ['user',  'gender', 'about_me', 'get_profile_image']
 
+class UserLearningPathSerializer(serializers.ModelSerializer):
+    # user = UserSerializer()
+    class Meta:
+        model = UserLearningPath
+        fields = ('id', 'user', 'learning_path')
 
 class SiteAboutSerializer(serializers.ModelSerializer):
     class Meta:

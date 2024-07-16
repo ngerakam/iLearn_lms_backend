@@ -4,6 +4,7 @@ from django.core.mail import send_mail
 from django.http import QueryDict
 from django.db import transaction
 from django.contrib.auth.hashers import make_password
+from django.shortcuts import get_object_or_404
 #
 from rest_framework import exceptions,status
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
@@ -14,8 +15,12 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 #
-from .models import User, UserProfile, SiteSetup,SiteAddress, SiteAbout
-from .serializers import UserSerializer, ProfileUserSerializer, SiteSetupSerializer
+from .models import (User, UserProfile, SiteSetup,
+                     SiteAddress, SiteAbout, UserLearningPath)
+from .serializers import (UserSerializer, ProfileUserSerializer
+                          , SiteSetupSerializer, UserLearningPathSerializer)
+
+from course.models import LearningPath
 
 class RegisterAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -147,6 +152,37 @@ class UserLogoutAPI(APIView):
             return Response({'error': 'Failed to logout.', 'detail': str(e)},
                              status=status.HTTP_400_BAD_REQUEST)
 
+class UserLearningPathAPIView(APIView):
+    def get(self,request,pk=None):
+        try:
+            learining_paths = UserLearningPath.objects.filter(user__id=pk)
+            serializer = UserLearningPathSerializer(learining_paths, many=True)
+            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    def put(self, request, pk=None):
+        try:
+            user = get_object_or_404(User, id=pk)
+            learning_path_ids = request.data.get('learning_paths', [])
+
+            # Clear existing user learning paths
+            UserLearningPath.objects.filter(user=user).delete()
+
+            # Create new user learning paths
+            for lp_id in learning_path_ids:
+                learning_path = get_object_or_404(LearningPath, id=lp_id)
+                UserLearningPath.objects.get_or_create(user=user, learning_path=learning_path)
+
+            # Fetch updated user learning paths
+            updated_learning_paths = UserLearningPath.objects.filter(user=user)
+            serializer = UserLearningPathSerializer(updated_learning_paths, many=True)
+
+            return Response({"data": serializer.data,
+                              "message": "User learning paths updated successfully"}
+                              , status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
 class SiteSetupDetailAPIView(APIView):
     def get(self, request, *args, **kwargs):
         try:
