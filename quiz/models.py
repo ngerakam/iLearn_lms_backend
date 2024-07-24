@@ -131,7 +131,7 @@ class UserQuizSession(models.Model):
         verbose_name_plural = 'UserQuizSessions'
 
     def __str__(self):
-        return f"{self.user} - {self.quiz}"
+        return f"{self.quiz}"
 
     def save(self, *args, **kwargs):
         if self.end and self.start:

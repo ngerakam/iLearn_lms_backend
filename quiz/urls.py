@@ -2,6 +2,7 @@ from django.urls import path
 from .views import *
 
 urlpatterns = [
+    #Quiz views
     path('courses/<str:course_slug>/',QuizListAPIView.as_view()),
     path('courses/<str:course_slug>/quiz/<str:quiz_slug>/',QuizRetriveAPIView.as_view()),
     #Question views
@@ -24,7 +25,7 @@ urlpatterns = [
     ),
     path(
         'courses/<str:course_slug>/quiz/<str:quiz_slug>/questions/<str:question_pk>/mtp_types/<str:mtp_pk>/options/<str:mtpo_pk>/',
-        MultipleChoiceQuestionsOptionsListCreateView.as_view()
+        MultipleChoiceQuestionsOptionsDetailView.as_view()
     ),
     #true or false questions views
     path(
@@ -47,4 +48,7 @@ urlpatterns = [
     path(
 'courses/<str:course_slug>/quiz/<str:quiz_slug>/questions/<str:question_pk>/essay_types/<str:essay_pk>/answers/<str:essay_ans_pk/',
         EssayQuestionAnswerListCreateView.as_view()),
+    #User Sessions --- Test
+    path('courses/<str:course_slug>/quiz/<str:quiz_slug>/sessions/',UserQuizSessionListCreateView.as_view()),
+    path('courses/<str:course_slug>/quiz/<str:quiz_slug>/sessions/<str:session_pk>/',UserQuizSessionListCreateView.as_view()),
 ]

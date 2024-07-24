@@ -64,17 +64,16 @@ class QuizRetriveAPIView(APIView):
         try:
             course = Course.objects.get(slug=course_slug)
             quiz = Quiz.objects.get(course=course, slug=quiz_slug)
-            data.course=course,
-            data.title=data.get('title')
-            data.slug=data.get('slug')
-            data.description=data.get('description')
-            data.category=data.get('category')
-            data.random_order = data.get('random_order')
-            data.answers_at_end = data.get('answers_at_end')
-            data.exam_paper = data.get('exam_paper')
-            data.single_attempt = data.get('single_attempt')
-            data.pass_mark = data.get('pass_mark')
-            data.draft = data.get('draft')
+            quiz.title=data.get('title')
+            quiz.slug=data.get('slug')
+            quiz.description=data.get('description')
+            quiz.category=data.get('category')
+            quiz.random_order = data.get('random_order')
+            quiz.answers_at_end = data.get('answers_at_end')
+            quiz.exam_paper = data.get('exam_paper')
+            quiz.single_attempt = data.get('single_attempt')
+            quiz.pass_mark = data.get('pass_mark')
+            quiz.draft = data.get('draft')
             quiz.save()
             serializer = QuizSerializer(quiz, many=False)
             return Response({"data":serializer.data}, status=status.HTTP_200_OK)
@@ -129,17 +128,20 @@ class QuestionDetailAPIView(APIView):
     
     def put(self,request,course_slug,quiz_slug,pk=None):
         data = request.data
+        print(data)
         try:
             quiz = Quiz.objects.get(course__slug=course_slug, slug=quiz_slug)
-            question = Question.objects.get(pk=pk,quiz=quiz)
-            data.quiz=quiz,
-            data.question_type=data.get('question_type'),
-            data.text = data.get('text'),
-            data.marks = data.get('marks')
+            question = Question.objects.get(pk=pk, quiz=quiz)
+            
+            # Update the question fields
+            question.question_type = request.data.get('question_type', question.question_type)
+            question.text = request.data.get('text', question.text)
+            question.marks = request.data.get('marks', question.marks)
+            
             question.save()
-            serializer = QuestionSerializer(question, many=False)
-
-            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
+            
+            serializer = QuestionSerializer(question)
+            return Response({"data": serializer.data}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -149,7 +151,7 @@ class QuestionDetailAPIView(APIView):
             question = Question.objects.get(pk=pk,quiz=quiz)
             question.delete()
             return Response({
-            "message":f"The question: {question.id} is deleted successfully",
+            "message":f"The question: {question.text} is deleted successfully",
         })
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)        
@@ -250,6 +252,7 @@ class MultipleChoiceQuestionsOptionsDetailView(generics.RetrieveUpdateDestroyAPI
 
     def put(self, request, *args, **kwargs):
         instance = self.get_object()
+        print(instance)
         instance.option = request.data.get("option", instance.option)
         instance.correct_option = request.data.get("correct_option", instance.correct_option)
         instance.save()
@@ -309,7 +312,10 @@ class TrueFalseQuestionDetailView(generics.RetrieveUpdateDestroyAPIView):
     def delete(self, request, *args, **kwargs):
         instance = self.get_object()
         instance.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(
+            {
+            "message":f"The TrueOrFalse : {instance.id} is deleted successfully",
+        },status=status.HTTP_204_NO_CONTENT)
 
 class EssayQuestionListCreateView(generics.ListCreateAPIView):
     def get(self,request,course_slug,quiz_slug,pk=None):
