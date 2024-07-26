@@ -13,6 +13,8 @@ from .serializers import (LearningPathSerializer, CategorySerializer, CourseSeri
                             CourseDetailStatusSerializer, LessonSerializer, CommentSerializer,
                              EnrollmentSerializer, ProgressSerializer)
 
+from authentication.models import UserLearningPath
+
 class LearningPathListAPIView(APIView):
     def get(self, request):
         try:
@@ -146,13 +148,16 @@ class CoursesListAPIView(ListAPIView):
         try:
             lp_slug = self.request.query_params.get('lp_slug')
             cat_slug = self.request.query_params.get('cat_slug')
+            user_courses = self.request.query_params.get('user_courses')
+
+            queryset = self.get_queryset()
 
             if lp_slug:
-                queryset = self.filter_by_learning_path(lp_slug)
+                queryset = self.filter_by_learning_path(queryset, lp_slug)
             elif cat_slug:
-                queryset = self.filter_by_category(cat_slug)
-            else:
-                queryset = self.get_queryset()
+                queryset = self.filter_by_category(queryset, cat_slug)
+            elif user_courses and user_courses.lower() == 'true':
+                queryset = self.filter_by_user_learning_paths(queryset, request.user)
 
             serializer = self.get_serializer(queryset, many=True)
             return Response({'data': serializer.data}, status=status.HTTP_200_OK)
@@ -160,13 +165,16 @@ class CoursesListAPIView(ListAPIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
-    def filter_by_learning_path(self, lp_slug):
-        courses = Course.objects.filter(learning_path__slug=lp_slug)
-        return courses
+    def filter_by_learning_path(self, queryset, lp_slug):
+        return queryset.filter(learning_path__slug=lp_slug)
 
-    def filter_by_category(self, cat_slug):
-        courses = Course.objects.filter(categories__slug=cat_slug)
-        return courses
+    def filter_by_category(self, queryset, cat_slug):
+        return queryset.filter(categories__slug=cat_slug)
+    
+    def filter_by_user_learning_paths(self, queryset, user):
+        user_learning_paths = UserLearningPath.objects.filter(user=user).values_list('learning_path', flat=True)
+        return queryset.filter(learning_path__in=user_learning_paths).distinct()
+
 
     def post(self, request):
         data = request.data

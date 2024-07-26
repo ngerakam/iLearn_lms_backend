@@ -3,7 +3,6 @@ from .base import *
 
 ALLOWED_HOSTS = ['0.0.0.0','*']
 
-WEBSITE_URL = 'http://192.0.0.18:8000'
 
 DATABASES = {
     'default': {

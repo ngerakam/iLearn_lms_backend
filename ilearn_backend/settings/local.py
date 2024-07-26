@@ -3,7 +3,13 @@ import os
 
 ALLOWED_HOSTS = ['0.0.0.0','*']
 
-WEBSITE_URL = 'http://127.0.0.1:8000'
+WEBSITE_URL = os.getenv('WEBSITE_URL')
+
+
+# Set X_FRAME_OPTIONS dynamically using the environment variable
+X_FRAME_OPTIONS = f'ALLOW-FROM {WEBSITE_URL}'
+
+CSP_FRAME_ANCESTORS = ("'self'", WEBSITE_URL)
 
 DATABASES = {
     "default": {

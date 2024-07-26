@@ -184,6 +184,7 @@ class CourseActivityAPIView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def put(self, request, course_slug):
+        print(request.data)
         try:
             course = Course.objects.get(slug=course_slug)
             activity = CourseActivity.objects.get(

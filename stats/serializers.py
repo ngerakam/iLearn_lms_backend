@@ -2,6 +2,8 @@ from rest_framework import serializers
 
 from authentication.models import User
 from course.models import Course, Module, Lesson
+from activity.models import CourseActivity, ModuleActivity, LessonActivity, ActivityLog
+
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -32,3 +34,19 @@ class ModuleWithLessonsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Module
         fields = ('id', 'course', 'title', 'slug', 'description', 'lessons')
+
+
+class CourseActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CourseActivity
+        fields = ('id','activity_course', 'status', 'created_by')
+
+class ModuleActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ModuleActivity
+        fields = ('id', 'activity_module','status', 'created_by')
+
+class LessonActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LessonActivity
+        fields = ('id', 'activity_lesson','status', 'created_by')

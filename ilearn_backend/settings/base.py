@@ -12,6 +12,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 
+WEBSITE_URL = os.getenv('WEBSITE_URL')
+
+
+# Set X_FRAME_OPTIONS dynamically using the environment variable
+X_FRAME_OPTIONS = f'ALLOW-FROM {WEBSITE_URL}'
+
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_FRAME_ANCESTORS = ("'self'", WEBSITE_URL)
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -69,6 +78,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'csp',
     'authentication',
     'course',
     'activity',
@@ -84,7 +94,12 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:8080',
 ]
 # CORS_ORIGIN_ALLOW_ALL = True
-
+CORS_ALLOW_HEADERS = [
+    'content-type',
+    'accept',
+    'authorization',
+    'x-csrftoken',
+]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -95,6 +110,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'csp.middleware.CSPMiddleware',
 ]
 
 ROOT_URLCONF = 'ilearn_backend.urls'
