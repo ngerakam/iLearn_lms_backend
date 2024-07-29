@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import (Quiz, Question, MultipleChoiceQuestion,
                       MultipleChoiceQuestionsOptions
                      , TrueFalseQuestion, EssayQuestion,
-                       EssayQuestionAnswer, UserQuizSession)
+                       EssayQuestionAnswer, QuizAttempt, EssayGrade)
 
 class QuizSerializer(serializers.ModelSerializer):
     class Meta:
@@ -39,8 +39,13 @@ class EssayQuestionAnswerSerializer(serializers.ModelSerializer):
         model = EssayQuestionAnswer
         fields = '__all__'
 
-class UserQuizSessionSerializer(serializers.ModelSerializer):
+class QuizAttemptSerializer(serializers.ModelSerializer):
     class Meta:
-        model = UserQuizSession
+        model = QuizAttempt
+        fields = '__all__'
+
+class EssayGradeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EssayGrade
         fields = '__all__'
 

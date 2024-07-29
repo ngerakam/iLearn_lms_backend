@@ -4,6 +4,8 @@ from django.dispatch import receiver
 from django.db.models.signals import post_save,post_delete
 from django.core.validators import MaxValueValidator, validate_comma_separated_integer_list
 from autoslug import AutoSlugField
+from django.utils import timezone
+from datetime import timedelta
 
 CONTENT= 'content'
 RANDOM = 'random'
@@ -38,6 +40,7 @@ class Quiz(models.Model):
     pass_mark = models.SmallIntegerField(default=50, validators=[MaxValueValidator(100)])
     draft = models.BooleanField(default=False)
     timestamp = models.DateTimeField(auto_now=True)
+    time_limit = models.PositiveIntegerField(help_text="Time limit in minutes", null=True, blank=True)
 
     def __str__(self):
         return self.title
@@ -113,55 +116,83 @@ class EssayQuestionAnswer(models.Model):
     def __str__(self):
         return f"Question {self.essay_question.question.text} for answer {self.text}"
 
-class UserQuizSession(models.Model):
-    users = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='sessions')
-    quiz = models.ForeignKey(Quiz, related_name='sessions', on_delete=models.CASCADE)
-    question_order = models.CharField(max_length=30, choices=CHOICE_ORDER_OPTIONS, blank=True, null=True)
-    question_list = models.CharField(max_length=1024, validators=[validate_comma_separated_integer_list])
-    incorrect_questions = models.CharField(max_length=1024, blank=True, validators=[validate_comma_separated_integer_list])
-    current_score = models.IntegerField(default=0)
-    complete = models.BooleanField(default=False)
-    user_answers = models.TextField(blank=True, default="{}")
-    take_time = models.DurationField(null=True, blank=True)
-    start = models.DateTimeField(null=True, blank=True)
-    end = models.DateTimeField(null=True, blank=True)
-    grade = models.FloatField(blank=True, null=True)
-
-    class Meta:
-        verbose_name_plural = 'UserQuizSessions'
+class QuizAttempt(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='quiz_attempts', on_delete=models.CASCADE)
+    quiz = models.ForeignKey('Quiz', related_name='attempts', on_delete=models.CASCADE)
+    start_time = models.DateTimeField(auto_now_add=True)
+    end_time = models.DateTimeField(null=True, blank=True)
+    score = models.IntegerField(null=True, blank=True)
+    completed = models.BooleanField(default=False)
+    answers = models.JSONField(default=dict)
+    score_calculated = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"{self.quiz}"
+        return f"{self.user.username}'s attempt on {self.quiz.title}"
 
-    def save(self, *args, **kwargs):
-        if self.end and self.start:
-            self.take_time = self.end - self.start  
-        super().save(*args, **kwargs)
+    def save_answers(self, answers_dict):
+        for question_id, answer_data in answers_dict.items():
+            self.answers[str(question_id)] = answer_data['answer']
+        self.save()
 
-@receiver(post_save, sender=UserQuizSession)
-def set_question_order(sender, instance, created, **kwargs):
-    if created:
-        quiz = instance.quiz
-        questions = quiz.questions.all()
+    def complete_attempt(self):
+        from .tasks import calculate_quiz_score
+        if not self.completed:
+            self.completed = True
+            self.end_time = timezone.now()
+            self.save()
+            calculate_quiz_score.delay(self.id)
 
-        # Determine the order of questions based on quiz settings
-        if instance.question_order == CONTENT:
-            # No additional ordering needed if questions are already in content order
-            pass
-        elif instance.question_order == RANDOM:
-            questions = instance.quiz.questions.order_by("?")
-        elif instance.question_order == NONE:
-            # No specific order, use default queryset order
-            pass
+    def is_time_expired(self):
+        if not self.quiz.time_limit:
+            return False
+        time_limit = timedelta(minutes=self.quiz.time_limit)
+        return timezone.now() - self.start_time > time_limit
 
-        # Generate question order and update the instance
-        instance.question_order = ",".join([str(q.id) for q in questions])
-        instance.question_list = instance.question_order
-        instance.save()
+    def time_remaining(self):
+        if not self.quiz.time_limit:
+            return None
+        time_limit = timedelta(minutes=self.quiz.time_limit)
+        elapsed_time = timezone.now() - self.start_time
+        remaining = time_limit - elapsed_time
+        return max(timedelta(0), remaining)
+        
+    def all_essays_graded(self):
+        essay_questions = self.quiz.questions.filter(question_type='essay')
+        graded_essays = self.essay_grades.all()
+        return essay_questions.count() == graded_essays.count()
 
-        # Ensure correct ordering of choices if applicable
-        for question in questions:
-            if question.question_type == Question.MULTIPLE_CHOICE:
-                multiple_choice_question = question.multiple_choice_question
-                options = multiple_choice_question.order_choices(multiple_choice_question.options.all())
-                multiple_choice_question.options.set(options)
+    def calculate_total_score(self):
+        total_score = 0
+        for question_id, answer in self.answers.items():
+            try:
+                question = self.quiz.questions.get(id=int(question_id))
+                if question.question_type in ['multi-choice', 'boolean']:
+                    if question.question_type == 'multi-choice':
+                        correct_option = question.multiple_choice_question.options.get(correct_option=True)
+                        if answer == correct_option.option:
+                            total_score += question.marks
+                    elif question.question_type == 'boolean':
+                        if answer == question.true_false_question.correct_answer:
+                            total_score += question.marks
+                elif question.question_type == 'essay':
+                    essay_grade = self.essay_grades.filter(question=question).first()
+                    if essay_grade and essay_grade.score is not None:
+                        total_score += essay_grade.score
+            except Question.DoesNotExist:
+                # Log this error or handle it as appropriate for your application
+                pass
+        return total_score
+class EssayGrade(models.Model):
+    quiz_attempt = models.ForeignKey('QuizAttempt', on_delete=models.CASCADE, related_name='essay_grades')
+    question = models.ForeignKey('Question', on_delete=models.CASCADE)
+    grader = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='essay_grader')
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='essay_student')
+    score = models.IntegerField(null=True, blank=True)
+    feedback = models.TextField(blank=True)
+    graded_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('quiz_attempt', 'question')
+
+    def __str__(self):
+        return f"Essay grade for {self.quiz_attempt} - Question {self.question.id}"

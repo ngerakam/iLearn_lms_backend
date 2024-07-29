@@ -142,7 +142,7 @@ class CategoryAPIView(APIView):
 
 class CoursesListAPIView(ListAPIView):
     serializer_class = CourseSerializer
-    queryset = Course.objects.all()
+    queryset = Course.objects.all() 
 
     def get(self, request, *args, **kwargs):
         try:

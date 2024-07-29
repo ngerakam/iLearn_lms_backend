@@ -22,7 +22,7 @@ CSP_DEFAULT_SRC = ("'self'",)
 CSP_FRAME_ANCESTORS = ("'self'", WEBSITE_URL)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG")
 
 
 
@@ -182,3 +182,11 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 1048576000  # 1 GB
 
 # File upload settings
 FILE_UPLOAD_MAX_MEMORY_SIZE = 1048576000  # 1 GB
+
+# Celery settings
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'

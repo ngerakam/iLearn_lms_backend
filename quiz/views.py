@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -9,11 +10,12 @@ from .serializers import (QuizSerializer, QuestionSerializer,
                              MultipleChoiceQuestionsOptionsSerializer,
                                TrueFalseQuestionSerializer,
                            EssayQuestionSerializer,
-                             EssayQuestionAnswerSerializer, UserQuizSessionSerializer)
+                             EssayQuestionAnswerSerializer, QuizAttemptSerializer,
+                             EssayGradeSerializer)
 from .models import (Quiz, Question, MultipleChoiceQuestion,
                       MultipleChoiceQuestionsOptions,
                       TrueFalseQuestion, EssayQuestion,
-                        EssayQuestionAnswer, UserQuizSession)
+                        EssayQuestionAnswer, QuizAttempt, EssayGrade)
 from course.models import Course
 
 class QuizListAPIView(APIView):
@@ -421,63 +423,62 @@ class EssayQuestionAnswerDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-class UserQuizSessionListCreateView(APIView):
-    def get(self,request,course_slug,quiz_slug):
-        try:
-            quiz = Quiz.objects.get(course__slug=course_slug, slug=quiz_slug)
-            sessions = quiz.sessions.all()
-            serializer = UserQuizSessionSerializer(sessions, many=True)
+class QuizSessionView(APIView):
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        quiz_id = request.data.get('quiz')
+        user_answers = request.data.get('user_answers')
+        end_time = timezone.now()
 
-            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST) 
-
-    def post(self,request,course_slug,quiz_slug):
-        data = request.data
-        print(data)
         try:
-            quiz = Quiz.objects.get(course__slug=course_slug, slug=quiz_slug)
-            session = UserQuizSession.objects.create(
-                quiz=quiz,
-                start=data.get('start'),
-                end=data.get('end'),
-                users = data.get('users')
-            )
-            session.save()
-            serializer = UserQuizSession(session, many=False)
-            return Response({"data":serializer.data}, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            quiz_attempt = QuizAttempt.objects.get(user=user, quiz_id=quiz_id, completed=False)
+        except QuizAttempt.DoesNotExist:
+            return Response({"error": "No active quiz attempt found"}, status=status.HTTP_400_BAD_REQUEST)
 
-class UserQuizSessionDetailView(APIView):
-    def get(self,request,course_slug,quiz_slug,session_pk):
-        try:
-            session = UserQuizSession.objects.get(quiz__slug=quiz_slug, pk=session_pk)
-            serializer = UserQuizSessionSerializer(session, many=False)
+        if quiz_attempt.is_time_expired():
+            quiz_attempt.end_time = end_time
+            quiz_attempt.completed = True
+            quiz_attempt.save()
+            return Response({"error": "Quiz time limit exceeded"}, status=status.HTTP_400_BAD_REQUEST)
 
-            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
-    def put(self,request,course_slug,quiz_slug,session_pk):
-        data = request.data
-        try:
-            session = UserQuizSession.objects.get(quiz__slug=quiz_slug, pk=session_pk)
-            session.start=data.get('start'),
-            session.end=data.get('end'),
-            session.users = data.get('users')
-            session.save()
-            serializer = UserQuizSessionSerializer(session, many=False)
-            return Response({"data":serializer.data}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        quiz_attempt.save_answers(user_answers)
+        quiz_attempt.complete_attempt()
 
-    def delete(self,request,course_slug,quiz_slug,session_pk):
+        return Response({
+            "message": "Quiz submitted successfully. Your score will be calculated shortly.",
+            "time_taken": (quiz_attempt.end_time - quiz_attempt.start_time).total_seconds() // 60
+        }, status=status.HTTP_201_CREATED)
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        quiz_id = request.query_params.get('quiz')
+
         try:
-            session = UserQuizSession.objects.get(quiz__slug=quiz_slug, pk=session_pk)
-            session.delete()
-            return Response({
-            "message":f"The Session for: {session.quiz.title} is deleted successfully",
+            quiz_attempt = QuizAttempt.objects.get(user=user, quiz_id=quiz_id, completed=False)
+        except QuizAttempt.DoesNotExist:
+            # Create a new attempt if one doesn't exist
+            quiz = Quiz.objects.get(id=quiz_id)
+            quiz_attempt = QuizAttempt.objects.create(user=user, quiz=quiz)
+
+        time_remaining = quiz_attempt.time_remaining()
+
+        return Response({
+            "attempt_id": quiz_attempt.id,
+            "start_time": quiz_attempt.start_time,
+            "time_remaining": time_remaining.total_seconds() if time_remaining else None
         })
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+class ScoreCheckView(APIView):
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        attempt_id = request.query_params.get('attempt_id')
+
+        try:
+            quiz_attempt = QuizAttempt.objects.get(id=attempt_id, user=user, completed=True)
+        except QuizAttempt.DoesNotExist:
+            return Response({"error": "Quiz attempt not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if quiz_attempt.score_calculated:
+            return Response({"score": quiz_attempt.score},status=status.HTTP_200_OK)
+        else:
+            return Response({"message": "Score is still being calculated"},
+                             status=status.HTTP_202_ACCEPTED)
