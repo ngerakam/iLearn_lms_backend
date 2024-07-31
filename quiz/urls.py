@@ -48,4 +48,7 @@ urlpatterns = [
     path(
 'courses/<str:course_slug>/quiz/<str:quiz_slug>/questions/<str:question_pk>/essay_types/<str:essay_pk>/answers/<str:essay_ans_pk/',
         EssayQuestionAnswerListCreateView.as_view()),
+    path(
+'courses/<str:course_slug>/quiz/<str:quiz_slug>/quiz-sessions/',
+        QuizSessionView.as_view()),
 ]

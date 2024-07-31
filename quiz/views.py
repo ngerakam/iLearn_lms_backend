@@ -16,6 +16,8 @@ from .models import (Quiz, Question, MultipleChoiceQuestion,
                       MultipleChoiceQuestionsOptions,
                       TrueFalseQuestion, EssayQuestion,
                         EssayQuestionAnswer, QuizAttempt, EssayGrade)
+from .utils import check_answers, extract_quiz_info
+from .tasks import calculate_quiz_score
 from course.models import Course
 
 class QuizListAPIView(APIView):
@@ -424,49 +426,43 @@ class EssayQuestionAnswerDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class QuizSessionView(APIView):
+    def get(self, request, *args, **kwargs):
+        pass
     def post(self, request, *args, **kwargs):
         user = request.user
-        quiz_id = request.data.get('quiz')
-        user_answers = request.data.get('user_answers')
-        end_time = timezone.now()
-
-        try:
-            quiz_attempt = QuizAttempt.objects.get(user=user, quiz_id=quiz_id, completed=False)
-        except QuizAttempt.DoesNotExist:
-            return Response({"error": "No active quiz attempt found"}, status=status.HTTP_400_BAD_REQUEST)
-
-        if quiz_attempt.is_time_expired():
-            quiz_attempt.end_time = end_time
-            quiz_attempt.completed = True
-            quiz_attempt.save()
-            return Response({"error": "Quiz time limit exceeded"}, status=status.HTTP_400_BAD_REQUEST)
-
-        quiz_attempt.save_answers(user_answers)
-        quiz_attempt.complete_attempt()
-
+        data = request.data
+        quiz_id = data.get('quiz')
+        quiz = Quiz.objects.get(id=quiz_id)
+        # print(data)
+        quiz_attempt = QuizAttempt.objects.create(user=user,quiz=quiz)
+        quiz_attempt.save()
         return Response({
-            "message": "Quiz submitted successfully. Your score will be calculated shortly.",
-            "time_taken": (quiz_attempt.end_time - quiz_attempt.start_time).total_seconds() // 60
+            "message": f"Quiz: {quiz} started successfully!",
         }, status=status.HTTP_201_CREATED)
 
-    def get(self, request, *args, **kwargs):
+    def put(self, request, *args, **kwargs):
         user = request.user
-        quiz_id = request.query_params.get('quiz')
+        data = request.data
+        obj = extract_quiz_info(data)
+        quiz_id = obj['quiz_id']
+        user_answers = obj['user_answers']
+        quiz = Quiz.objects.get(id=quiz_id)
+        end_time = timezone.now()
+        quiz_attempt = QuizAttempt.objects.get(user=user,quiz=quiz)
+        # Update the answers
+        quiz_attempt.answers.update(user_answers)
+        quiz_attempt.save()
 
-        try:
-            quiz_attempt = QuizAttempt.objects.get(user=user, quiz_id=quiz_id, completed=False)
-        except QuizAttempt.DoesNotExist:
-            # Create a new attempt if one doesn't exist
-            quiz = Quiz.objects.get(id=quiz_id)
-            quiz_attempt = QuizAttempt.objects.create(user=user, quiz=quiz)
-
-        time_remaining = quiz_attempt.time_remaining()
+        # Mark the attempt as complete and set the end time
+        if not quiz_attempt.completed:
+            quiz_attempt.end_time = timezone.now()
+            quiz_attempt.completed = True
+            quiz_attempt.save()
+            calculate_quiz_score.delay(quiz_attempt.id)
 
         return Response({
-            "attempt_id": quiz_attempt.id,
-            "start_time": quiz_attempt.start_time,
-            "time_remaining": time_remaining.total_seconds() if time_remaining else None
-        })
+            "message": f"Quiz {quiz} submitted successfully. Your score will be calculated shortly.",
+        }, status=status.HTTP_200_OK)
 class ScoreCheckView(APIView):
     def get(self, request, *args, **kwargs):
         user = request.user

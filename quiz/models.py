@@ -6,6 +6,8 @@ from django.core.validators import MaxValueValidator, validate_comma_separated_i
 from autoslug import AutoSlugField
 from django.utils import timezone
 from datetime import timedelta
+from .tasks import calculate_quiz_score
+
 
 CONTENT= 'content'
 RANDOM = 'random'
@@ -126,62 +128,45 @@ class QuizAttempt(models.Model):
     answers = models.JSONField(default=dict)
     score_calculated = models.BooleanField(default=False)
 
-    def __str__(self):
-        return f"{self.user.username}'s attempt on {self.quiz.title}"
+    class Meta:
+        unique_together=('user','quiz')
 
     def save_answers(self, answers_dict):
+        """
+        Save user answers to the answers field.
+        """
         for question_id, answer_data in answers_dict.items():
             self.answers[str(question_id)] = answer_data['answer']
+            question = self.quiz.questions.get(id=int(question_id))
+            if question.question_type == 'essay':
+                EssayGrade.objects.create(
+                    quiz_attempt=self,
+                    question=question,
+                    student=self.user,
+                    grader=None,
+                    score=None,
+                    feedback=''
+                )
         self.save()
 
     def complete_attempt(self):
-        from .tasks import calculate_quiz_score
+        """
+        Mark the attempt as completed, set the end time, and trigger the score calculation task.
+        """
         if not self.completed:
             self.completed = True
             self.end_time = timezone.now()
             self.save()
-            calculate_quiz_score.delay(self.id)
+            calculate_quiz_score.delay(self.id)  # Use the task here
 
-    def is_time_expired(self):
-        if not self.quiz.time_limit:
-            return False
-        time_limit = timedelta(minutes=self.quiz.time_limit)
-        return timezone.now() - self.start_time > time_limit
-
-    def time_remaining(self):
-        if not self.quiz.time_limit:
-            return None
-        time_limit = timedelta(minutes=self.quiz.time_limit)
-        elapsed_time = timezone.now() - self.start_time
-        remaining = time_limit - elapsed_time
-        return max(timedelta(0), remaining)
-        
     def all_essays_graded(self):
         essay_questions = self.quiz.questions.filter(question_type='essay')
         graded_essays = self.essay_grades.all()
         return essay_questions.count() == graded_essays.count()
 
-    def calculate_total_score(self):
-        total_score = 0
-        for question_id, answer in self.answers.items():
-            try:
-                question = self.quiz.questions.get(id=int(question_id))
-                if question.question_type in ['multi-choice', 'boolean']:
-                    if question.question_type == 'multi-choice':
-                        correct_option = question.multiple_choice_question.options.get(correct_option=True)
-                        if answer == correct_option.option:
-                            total_score += question.marks
-                    elif question.question_type == 'boolean':
-                        if answer == question.true_false_question.correct_answer:
-                            total_score += question.marks
-                elif question.question_type == 'essay':
-                    essay_grade = self.essay_grades.filter(question=question).first()
-                    if essay_grade and essay_grade.score is not None:
-                        total_score += essay_grade.score
-            except Question.DoesNotExist:
-                # Log this error or handle it as appropriate for your application
-                pass
-        return total_score
+    def __str__(self):
+        return f"{self.user.username}'s attempt on {self.quiz.title}"
+
 class EssayGrade(models.Model):
     quiz_attempt = models.ForeignKey('QuizAttempt', on_delete=models.CASCADE, related_name='essay_grades')
     question = models.ForeignKey('Question', on_delete=models.CASCADE)
@@ -196,3 +181,17 @@ class EssayGrade(models.Model):
 
     def __str__(self):
         return f"Essay grade for {self.quiz_attempt} - Question {self.question.id}"
+
+# Signal to update graded_at when grader is updated and recalculate score
+@receiver(post_save, sender=EssayGrade)
+def update_graded_at_and_recalculate_score(sender, instance, **kwargs):
+    if instance.grader and instance.score is not None:
+        # Update the graded_at field
+        instance.graded_at = timezone.now()
+        instance.save(update_fields=['graded_at'])
+
+        # Check if all essays are graded
+        if instance.quiz_attempt.all_essays_graded():
+            instance.quiz_attempt.score_calculated = False
+            instance.quiz_attempt.save()
+            calculate_quiz_score.delay(instance.quiz_attempt.id)
