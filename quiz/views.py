@@ -500,8 +500,17 @@ class QuizSessionView(APIView):
             quiz_attempt.completed = True
             quiz_attempt.save()
             print("####################### caculated ###############")
-            results = calculate_quiz_score.delay(quiz_attempt.id)
-            print(f"############# results: {results} ##################")
+            try:
+                results = calculate_quiz_score.delay(quiz_attempt.id)
+                print(f"############# results: {results} ##################")
+            except Exception as e:
+                print(f"Error calculating quiz score: {str(e)}")
+        else:
+            try:
+                results = calculate_quiz_score.delay(quiz_attempt.id)
+                print(f"############# results: {results} ##################")
+            except Exception as e:
+                print(f"Error calculating quiz score: {str(e)}")
 
         return Response({
             "message": f"Quiz {quiz} submitted successfully. Your score will be calculated shortly.",
@@ -521,3 +530,20 @@ class ScoreCheckView(APIView):
         else:
             return Response({"message": "Score is still being calculated"},
                              status=status.HTTP_202_ACCEPTED)
+
+
+class GradeEssayView(APIView):
+    def post(self, request, *args, **kwargs):
+        data = request.data
+        essay_grade_id = data.get('essay_grade_id')
+        score = data.get('score')
+        feedback = data.get('feedback')
+
+        essay_grade = EssayGrade.objects.get(id=essay_grade_id)
+        essay_grade.score = score
+        essay_grade.feedback = feedback
+        essay_grade.save()
+
+        return Response({
+            "message": "Essay grade updated successfully.",
+        }, status=status.HTTP_200_OK)

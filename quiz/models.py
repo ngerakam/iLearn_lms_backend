@@ -183,17 +183,12 @@ class EssayGrade(models.Model):
 
     def __str__(self):
         return f"Essay grade for {self.quiz_attempt.quiz.title} - Question {self.question.text}"
+from django.db import transaction
 
-# Signal to update graded_at when grader is updated and recalculate score
 @receiver(post_save, sender=EssayGrade)
-def update_graded_at_and_recalculate_score(sender, instance, **kwargs):
-    if instance.grader and instance.score is not None:
-        # Update the graded_at field
-        instance.graded_at = timezone.now()
-        instance.save(update_fields=['graded_at'])
-
-        # Check if all essays are graded
-        if instance.quiz_attempt.all_essays_graded():
+def recalculate_quiz_score_on_essay_grade_update(sender, instance, **kwargs):
+    if not kwargs.get('created') and instance.score is not None:
+        with transaction.atomic():
             instance.quiz_attempt.score_calculated = False
-            instance.quiz_attempt.save()
+            instance.quiz_attempt.save(update_fields=['score_calculated'])
             calculate_quiz_score.delay(instance.quiz_attempt.id)

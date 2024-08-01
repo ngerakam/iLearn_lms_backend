@@ -194,7 +194,7 @@ class CourseActivityAPIView(APIView):
                 created_by_id=request.user.id)
             activity.status=request.data.get('status')
             activity.save()
-            send_course_completion_email(request.user.id, course.id)
+            send_course_completion_email.delay(request.user.id, course.id)
             serializer = CourseActivitySerializer(activity, many=False)
             return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         except CourseActivity.DoesNotExist:
