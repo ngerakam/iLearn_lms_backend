@@ -9,11 +9,12 @@ from authentication.models import User
 
 
 @shared_task
-def create_progress(enrollment_id):
-    enrollment = Enrollment.objects.get(id=enrollment_id)
-    Progress.objects.create(user=enrollment.user, course=enrollment.course)
-    CourseActivity.objects.create(activity_course=enrollment.course,
-                                  status='started', created_by=enrollment.user)
+def create_progress(user_id,course_id):
+    user = User.objects.get(id=user_id)
+    course = Course.objects.get(id=course_id)
+    Progress.objects.create(user=user, course=course)
+    CourseActivity.objects.create(activity_course=course,
+                                  status='started', created_by=user)
 
 @shared_task
 def send_course_enrollment_email(user_id,course_id):

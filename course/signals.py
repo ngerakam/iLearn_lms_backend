@@ -5,8 +5,10 @@ from .tasks import send_course_enrollment_email, create_progress
 
 @receiver(post_save, sender=Enrollment)
 def create_progress_signal(sender, instance, created, **kwargs):
+    user = instance.user.id
+    course = instance.course.id
     if created:
-        create_progress.delay(instance.id)
+        create_progress.delay(user,course)
 
 @receiver(post_save, sender=Enrollment)
 def send_progress_email_signal(sender, instance, created, **kwargs):
