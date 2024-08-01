@@ -81,13 +81,9 @@ def check_answers(quiz_info):
 
 
 import logging
-from celery import shared_task
-
 
 logger = logging.getLogger(__name__)
 
-
-@shared_task
 def run_calculate_quiz_score(attempt_id):
     """
     Calculate the score for a given quiz attempt using Django models.
@@ -127,28 +123,27 @@ def run_calculate_quiz_score(attempt_id):
             if question.question_type == 'multi-choice':
                 mc_question = question.multiple_choice_question
                 correct_options = mc_question.options.filter(correct_option=True)
-                correct_option_ids = set(correct_options.values_list('id', flat=True))
-                user_selected_options = set(answer)
+                user_selected_options = answer
 
                 if mc_question.is_many_answers:
-                    # Calculate the score for each correct option
-                    correct_option_scores = []
-                    for option_id in user_selected_options & correct_option_ids:
-                        option = MultipleChoiceQuestionOption.objects.get(id=option_id)
-                        correct_option_scores.append(option.marks)
-
-                    # Calculate the score for each incorrect option
-                    incorrect_option_scores = []
-                    for option_id in user_selected_options - correct_option_ids:
-                        option = MultipleChoiceQuestionOption.objects.get(id=option_id)
-                        incorrect_option_scores.append(option.marks)
-
+                    # Calculate the marks for each correct option
+                    correct_option_marks = question.marks / correct_options.count()
+                    print("correct_options",correct_options)
+                    print("user_selected_options",user_selected_options)
+                    print("correct_option_marks",correct_option_marks)
                     # Calculate the total score for the question
-                    question_score = sum(correct_option_scores) - sum(incorrect_option_scores)
-                    question_score /= correct_options.count()
+                    question_score = 0
+                    for option in user_selected_options:
+                        for correct_option in correct_options:
+                            if option == correct_option.option:  # comparing with the 'option' field
+                                question_score += correct_option_marks
+                                print(option)
+                                print("MCQ many score",question_score)
                 else:
-                    correct_option_id = correct_options.first().id
-                    if answer == str(correct_option_id):
+                    correct_option = correct_options.first()
+                    if answer == correct_option.option:  # comparing with the 'option' field
+                        print(answer)
+                        print(correct_option)
                         question_score = question.marks
                     else:
                         question_score = 0

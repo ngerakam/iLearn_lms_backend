@@ -44,34 +44,37 @@ def run_calculate_quiz_score(attempt_id):
 
         try:
             if question.question_type == 'multi-choice':
-                # Get the multiple choice question object
-                multiple_choice_question = question.multiple_choice_question
-                
-                # Check if the question allows multiple answers
-                if multiple_choice_question.is_many_answers:
-                    # Get the correct options
-                    correct_options = multiple_choice_question.options.filter(correct_option=True)
-                    
-                    # Get the user's selected options that are correct
-                    user_answer_options = [option for option in correct_options if option.option in answer['answer']]
-                    
-                    # Calculate the score based on the number of correct options
-                    correct_count = len(correct_options)
-                    user_correct_count = len(user_answer_options)
-                    if correct_count > 0:
-                        question_score = (user_correct_count / correct_count) * question.marks
-                        user_marks += question_score
+                mc_question = question.multiple_choice_question
+                correct_options = mc_question.options.filter(correct_option=True)
+                user_selected_options = answer
+
+                if mc_question.is_many_answers:
+                    # Calculate the marks for each correct option
+                    correct_option_marks = question.marks / correct_options.count()
+                    print("correct_options",correct_options)
+                    print("user_selected_options",user_selected_options)
+                    print("correct_option_marks",correct_option_marks)
+                    # Calculate the total score for the question
+                    question_score = 0
+                    for option in user_selected_options:
+                        for correct_option in correct_options:
+                            if option == correct_option.option:  # comparing with the 'option' field
+                                question_score += correct_option_marks
+                                print("MCQ option",option)
+                                print("MCQ many score",question_score)
                 else:
-                    # Get the single correct option
-                    correct_option = multiple_choice_question.options.filter(correct_option=True).first()
-                    
-                    # Check if the user's answer matches the correct option
-                    if correct_option.option == answer['answer']:
-                        user_marks += question.marks
-            elif question.question_type == 'true-false':
+                    correct_option = correct_options.first()
+                    if answer == correct_option.option:  # comparing with the 'option' field
+                        print(answer)
+                        print(correct_option)
+                        question_score = question.marks
+                    else:
+                        question_score = 0
+
+            elif question.question_type == 'boolean':
                 true_false_question = question.true_false_question
-                if answer['answer'] == true_false_question.correct_answer:
-                    user_marks += question.marks
+                question_score = question.marks if answer == true_false_question.correct_answer else 0
+
             elif question.question_type == 'essay':
                 essay_grade = EssayGrade.objects.filter(
                     quiz_attempt=attempt,
@@ -83,6 +86,14 @@ def run_calculate_quiz_score(attempt_id):
                 else:
                     logger.warning(f"Essay for question {question_id} not graded yet")
                     question_score = 0  # We'll continue calculation, but mark this as potentially incomplete
+
+            else:
+                logger.warning(f"Unknown question type {question.question_type} for question {question_id}")
+                question_score = 0
+
+            user_marks += question_score
+            logger.debug(f"Score for question {question_id}: {question_score}")
+
         except Exception as e:
             logger.error(f"Error processing question {question_id}: {str(e)}")
             # Continue with next question instead of stopping the entire calculation
@@ -95,24 +106,20 @@ def run_calculate_quiz_score(attempt_id):
     # Check if the user passed the quiz
     passed = percentage_score >= quiz.pass_mark
 
-    with transaction.atomic():
-        attempt.score = user_marks
-        attempt.completed = True
-        attempt.save()
-
-        if all_essays_graded(attempt):
-            attempt.score_calculated = True
-            attempt.save()
+    # Update the QuizAttempt with the total score
+    attempt.score = user_marks
+    attempt.score_calculated = True
+    attempt.save()
 
     logger.info(f"Quiz attempt updated. Final score: {user_marks}, Passed: {passed}")
 
     # Return the result
     return {
-        'total_marks': total_marks,
-        'user_marks': user_marks,
+        'total_marks': int(total_marks),
+        'user_marks': int(user_marks),
         'percentage_score': percentage_score,
         'passed': passed,
-        'all_essays_graded': all_essays_graded(attempt)
+        'all_essays_graded': attempt.all_essays_graded()
     }
 
 def all_essays_graded(attempt):
