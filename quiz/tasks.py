@@ -67,8 +67,9 @@ def calculate_quiz_score(attempt_id):
                 correct_option_ids = set(correct_options.values_list('id', flat=True))
 
                 if mc_question.is_many_answers:
-                    if set(item["answer"]) == correct_option_ids:
-                        user_marks += question.marks
+                    marks_per_option = question.marks / correct_options.count()
+                    user_selected_correct_options = set(item["answer"]) & correct_option_ids
+                    user_marks += len(user_selected_correct_options) * marks_per_option
                 else:
                     if item["answer"] in correct_option_ids:
                         user_marks += question.marks

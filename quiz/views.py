@@ -486,8 +486,8 @@ class QuizSessionView(APIView):
                 pass
         # Update the answers
         print("####################### updating quiz attempt ###############")
-        # quiz_attempt.answers.update(up_user_answers)
-        # quiz_attempt.save()
+        quiz_attempt.answers.update(up_user_answers)
+        quiz_attempt.save()
         print(f"############# quiz_attempt: {quiz_attempt} ##################")
 
         # Mark the attempt as complete and set the end time
@@ -496,7 +496,8 @@ class QuizSessionView(APIView):
             quiz_attempt.completed = True
             quiz_attempt.save()
             print("####################### caculated ###############")
-            calculate_quiz_score.delay(quiz_attempt.id)
+            results = calculate_quiz_score.delay(quiz_attempt.id)
+            print(f"############# results: {results} ##################")
 
         return Response({
             "message": f"Quiz {quiz} submitted successfully. Your score will be calculated shortly.",
