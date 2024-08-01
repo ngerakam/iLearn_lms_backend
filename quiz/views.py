@@ -502,16 +502,16 @@ class QuizSessionView(APIView):
             quiz_attempt.save()
             print("####################### caculated ###############")
             try:
-                task_id = calculate_quiz_score.delay(quiz_attempt_id)
+                task_id = calculate_quiz_score.delay(quiz_attempt.id)
                 result = AsyncResult(task_id).result
-                print(f"############# results: {results} ##################")
+                print(f"############# results: {result} ##################")
             except Exception as e:
                 print(f"Error calculating quiz score: {str(e)}")
         else:
             try:
-                task_id = calculate_quiz_score.delay(quiz_attempt_id)
+                task_id = calculate_quiz_score.delay(quiz_attempt.id)
                 result = AsyncResult(task_id).result
-                print(f"############# results: {results} ##################")
+                print(f"############# results: {result} ##################")
             except Exception as e:
                 print(f"Error calculating quiz score: {str(e)}")
 
