@@ -7,9 +7,11 @@ from django.utils import timezone
 def calculate_quiz_score(attempt_id):
     QuizAttempt = apps.get_model('quiz', 'QuizAttempt')
     Question = apps.get_model('quiz', 'Question')
+    MultipleChoiceQuestion = apps.get_model('quiz', 'MultipleChoiceQuestion')
     MultipleChoiceQuestionOption = apps.get_model('quiz', 'MultipleChoiceQuestionsOptions')
     TrueFalseQuestion = apps.get_model('quiz', 'TrueFalseQuestion')
     EssayGrade = apps.get_model('quiz', 'EssayGrade')
+    EssayQuestionAnswer = apps.get_model('quiz', 'EssayQuestionAnswer')
 
     attempt = QuizAttempt.objects.get(id=attempt_id)
     quiz = attempt.quiz
@@ -25,12 +27,15 @@ def calculate_quiz_score(attempt_id):
             total_marks += question.marks
 
             if question.question_type == 'multi-choice':
-                correct_options = MultipleChoiceQuestionOption.objects.filter(question=question, correct_option=True)
-                if question.multiple_choice_question.is_many_answers:
-                    if set(user_answer) == set([opt.option for opt in correct_options]):
+                mc_question = MultipleChoiceQuestion.objects.get(question=question)
+                correct_options = MultipleChoiceQuestionOption.objects.filter(mtp_question=mc_question, correct_option=True)
+                correct_option_ids = correct_options.values_list('id', flat=True)
+
+                if mc_question.is_many_answers:
+                    if set(user_answer) == set(correct_option_ids):
                         user_marks += question.marks
                 else:
-                    if user_answer == correct_options[0].option:
+                    if user_answer in correct_option_ids:
                         user_marks += question.marks
 
             elif question.question_type == 'boolean':
@@ -39,18 +44,25 @@ def calculate_quiz_score(attempt_id):
                     user_marks += question.marks
 
             elif question.question_type == 'essay':
-                essay_grade = EssayGrade.objects.filter(quiz_attempt=attempt, question=question).first()
-                if essay_grade and essay_grade.score:
+                essay_answer = EssayQuestionAnswer.objects.filter(
+                    created_by=attempt.user,
+                    essay_question=question
+                ).first()
+
+                # Assuming EssayGrade exists or is calculated elsewhere
+                essay_grade = EssayGrade.objects.filter(
+                    quiz_attempt=attempt,
+                    question=question
+                ).first()
+
+                if essay_answer and essay_grade and essay_grade.score:
                     user_marks += essay_grade.score
 
         except Question.DoesNotExist:
             continue
 
     # Calculate the percentage score
-    if total_marks > 0:
-        percentage_score = (user_marks / total_marks) * 100
-    else:
-        percentage_score = 0
+    percentage_score = (user_marks / total_marks) * 100 if total_marks > 0 else 0
 
     # Check if the user passed the quiz
     passed = percentage_score >= quiz.pass_mark

@@ -448,14 +448,25 @@ class QuizSessionView(APIView):
         user_answers = obj['user_answers']
         quiz = Quiz.objects.get(id=quiz_id)
         end_time = timezone.now()
-        quiz_attempt = QuizAttempt.objects.get(user=user,quiz=quiz)
+        quiz_attempt, created = QuizAttempt.objects.get_or_create(user=user, quiz=quiz)
+
+        # Save or update essay answers
+        for question_id, answer in user_answers.items():
+            if isinstance(answer, dict) and 'text' in answer:  # Assuming essay answers are in a dict format
+                essay_question = EssayQuestion.objects.get(id=int(question_id))
+                EssayQuestionAnswer.objects.update_or_create(
+                    created_by=user,
+                    essay_question=essay_question,
+                    defaults={'text': answer['text'], 'is_correct': False}
+                )
+
         # Update the answers
         quiz_attempt.answers.update(user_answers)
         quiz_attempt.save()
 
         # Mark the attempt as complete and set the end time
         if not quiz_attempt.completed:
-            quiz_attempt.end_time = timezone.now()
+            quiz_attempt.end_time = end_time
             quiz_attempt.completed = True
             quiz_attempt.save()
             calculate_quiz_score.delay(quiz_attempt.id)
