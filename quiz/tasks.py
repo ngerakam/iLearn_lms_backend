@@ -7,35 +7,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def extract_quiz_info(data):
-    quiz_id = data.get('quiz')
-    user_answers = data.get('user_answers', {})
-    question_answers = []
-    
-    for question_id, answer_data in user_answers.items():
-        question_info = {
-            'questionId': int(question_id),
-            'answer': answer_data.get('answer', None),
-            'question_type': answer_data.get('question_type', 'unknown')
-        }
-        question_answers.append(question_info)
-    
-    return {
-        'quiz_id': quiz_id,
-        'user_answers': user_answers,
-        'question_answers': question_answers
-    }
-
-def extract_question_data(data):
-    return [
-        {
-            "question__pk": item["questionId"],
-            "answer": item["answer"],
-            "question_type": item["question_type"]
-        }
-        for item in data
-    ]
-
 @shared_task
 def calculate_quiz_score(attempt_id):
     QuizAttempt = apps.get_model('quiz', 'QuizAttempt')
@@ -86,13 +57,30 @@ def calculate_quiz_score(attempt_id):
                 mc_question = question.multiple_choice_question
                 correct_options = mc_question.options.filter(correct_option=True)
                 correct_option_ids = set(correct_options.values_list('id', flat=True))
+                user_selected_options = set(answer)
 
                 if mc_question.is_many_answers:
-                    marks_per_option = question.marks / correct_options.count()
-                    user_selected_correct_options = set(answer) & correct_option_ids
-                    question_score = len(user_selected_correct_options) * marks_per_option
+                    # Calculate the score for each correct option
+                    correct_option_scores = []
+                    for option_id in user_selected_options & correct_option_ids:
+                        option = MultipleChoiceQuestionOption.objects.get(id=option_id)
+                        correct_option_scores.append(option.marks)
+
+                    # Calculate the score for each incorrect option
+                    incorrect_option_scores = []
+                    for option_id in user_selected_options - correct_option_ids:
+                        option = MultipleChoiceQuestionOption.objects.get(id=option_id)
+                        incorrect_option_scores.append(option.marks)
+
+                    # Calculate the total score for the question
+                    question_score = sum(correct_option_scores) - sum(incorrect_option_scores)
+                    question_score /= correct_options.count()
                 else:
-                    question_score = question.marks if answer in correct_option_ids else 0
+                    correct_option_id = correct_options.first().id
+                    if answer == str(correct_option_id):
+                        question_score = question.marks
+                    else:
+                        question_score = 0
 
             elif question.question_type == 'boolean':
                 true_false_question = question.true_false_question
