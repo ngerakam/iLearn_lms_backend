@@ -53,13 +53,13 @@ def run_calculate_quiz_score(attempt_id):
                     # Calculate the score for each correct option
                     correct_option_scores = []
                     for option_id in user_selected_options & correct_option_ids:
-                        option = MultipleChoiceQuestionOption.objects.get(id=option_id)
+                        option = MultipleChoiceQuestionsOptions.objects.get(id=option_id)
                         correct_option_scores.append(option.marks)
 
                     # Calculate the score for each incorrect option
                     incorrect_option_scores = []
                     for option_id in user_selected_options - correct_option_ids:
-                        option = MultipleChoiceQuestionOption.objects.get(id=option_id)
+                        option = MultipleChoiceQuestionsOptions.objects.get(id=option_id)
                         incorrect_option_scores.append(option.marks)
 
                     # Calculate the total score for the question
