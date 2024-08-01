@@ -486,7 +486,11 @@ class QuizSessionView(APIView):
                 pass
         # Update the answers
         print("####################### updating quiz attempt ###############")
-        quiz_attempt.answers.update(up_user_answers)
+        answers_dict = {}
+        for item in user_answers:
+            answers_dict[str(item["question__pk"])] = item["answer"]
+        quiz_attempt.answers = answers_dict
+        quiz_attempt.save()
         quiz_attempt.save()
         print(f"############# quiz_attempt: {quiz_attempt} ##################")
 

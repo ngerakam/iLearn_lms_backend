@@ -35,6 +35,11 @@ def extract_question_data(data):
 @shared_task
 def calculate_quiz_score(attempt_id):
     QuizAttempt = apps.get_model('quiz', 'QuizAttempt')
+    print(f"Quiz attempt: {attempt}")
+    print(f"Answers: {attempt.answers}")
+    if not attempt.answers:
+        print(f"Error: No answers found for quiz attempt {attempt_id}")
+        return None
     Question = apps.get_model('quiz', 'Question')
     MultipleChoiceQuestion = apps.get_model('quiz', 'MultipleChoiceQuestion')
     MultipleChoiceQuestionOption = apps.get_model('quiz', 'MultipleChoiceQuestionsOptions')
@@ -43,9 +48,9 @@ def calculate_quiz_score(attempt_id):
     EssayQuestion = apps.get_model('quiz', 'EssayQuestion')
     EssayQuestionAnswer = apps.get_model('quiz', 'EssayQuestionAnswer')
 
+
     attempt = QuizAttempt.objects.get(id=attempt_id)
     quiz = attempt.quiz
-
     # Initialize total marks and user's marks
     total_marks = 0
     user_marks = 0
