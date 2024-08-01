@@ -1,0 +1,34 @@
+<!-- templates/notifications/registration/user_registration_email.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User Registration Email</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bulma@1.0.1/css/bulma.min.css"
+    />
+  </head>
+  <body>
+    <p>Hello <strong>{{ user.first_name }} {{ user.last_name }}</strong>,</p>
+    <p>Thank you for registering on our platform!</p>
+    <p>We're excited to have you on board.</p>
+    <p>Best regards,</p>
+    <p>Use the details to login</p>
+    <p>Username: <strong>{{user.email}}</strong></p>
+    <p>Your temporary password is: <strong>{{ password }}</strong></p>
+    <p>Please change your password after logging in.</p>
+    <p>
+      Please login to the system here
+      <a class="button is-primary" href="{{ url }}/log-in">login</a>
+    </p>
+    <p>
+      Your's faithfully <br />
+      Platform Team @ {{contacts.site.title}} <br />
+      {{contacts.phone_contact}} <br />
+      {{contacts.location_address}} <br />
+    </p>
+  </body>
+</html>
