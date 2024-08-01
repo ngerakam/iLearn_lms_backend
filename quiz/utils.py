@@ -81,11 +81,14 @@ def check_answers(quiz_info):
 
 
 import logging
+from celery import shared_task
 
 
 logger = logging.getLogger(__name__)
 
-def calculate_quiz_score(attempt_id):
+
+@shared_task
+def run_calculate_quiz_score(attempt_id):
     """
     Calculate the score for a given quiz attempt using Django models.
     
@@ -125,13 +128,30 @@ def calculate_quiz_score(attempt_id):
                 mc_question = question.multiple_choice_question
                 correct_options = mc_question.options.filter(correct_option=True)
                 correct_option_ids = set(correct_options.values_list('id', flat=True))
+                user_selected_options = set(answer)
 
                 if mc_question.is_many_answers:
-                    marks_per_option = question.marks / correct_options.count()
-                    user_selected_correct_options = set(answer) & correct_option_ids
-                    question_score = len(user_selected_correct_options) * marks_per_option
+                    # Calculate the score for each correct option
+                    correct_option_scores = []
+                    for option_id in user_selected_options & correct_option_ids:
+                        option = MultipleChoiceQuestionOption.objects.get(id=option_id)
+                        correct_option_scores.append(option.marks)
+
+                    # Calculate the score for each incorrect option
+                    incorrect_option_scores = []
+                    for option_id in user_selected_options - correct_option_ids:
+                        option = MultipleChoiceQuestionOption.objects.get(id=option_id)
+                        incorrect_option_scores.append(option.marks)
+
+                    # Calculate the total score for the question
+                    question_score = sum(correct_option_scores) - sum(incorrect_option_scores)
+                    question_score /= correct_options.count()
                 else:
-                    question_score = question.marks if answer in correct_option_ids else 0
+                    correct_option_id = correct_options.first().id
+                    if answer == str(correct_option_id):
+                        question_score = question.marks
+                    else:
+                        question_score = 0
 
             elif question.question_type == 'boolean':
                 true_false_question = question.true_false_question

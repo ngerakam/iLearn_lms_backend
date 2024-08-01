@@ -18,7 +18,7 @@ from .models import (Quiz, Question, MultipleChoiceQuestion,
                       TrueFalseQuestion, EssayQuestion,
                         EssayQuestionAnswer, QuizAttempt, EssayGrade)
 from .utils import check_answers, extract_quiz_info, extract_question_data
-from .tasks import calculate_quiz_score
+from .tasks import run_calculate_quiz_score
 from course.models import Course
 
 class QuizListAPIView(APIView):
@@ -502,15 +502,14 @@ class QuizSessionView(APIView):
             quiz_attempt.save()
             print("####################### caculated ###############")
             try:
-                task_id = calculate_quiz_score.delay(quiz_attempt.id)
-                result = AsyncResult(task_id).wait()
+                result = run_calculate_quiz_score.delay(quiz_attempt.id)
+                
                 print(f"############# results: {result} ##################")
             except Exception as e:
                 print(f"Error calculating quiz score: {str(e)}")
         else:
             try:
-                task_id = calculate_quiz_score.delay(quiz_attempt.id)
-                result = AsyncResult(task_id).wait()
+                result = run_calculate_quiz_score.delay(quiz_attempt.id)
                 print(f"############# results: {result} ##################")
             except Exception as e:
                 print(f"Error calculating quiz score: {str(e)}")
