@@ -6,7 +6,7 @@ from django.core.validators import MaxValueValidator, validate_comma_separated_i
 from autoslug import AutoSlugField
 from django.utils import timezone
 from datetime import timedelta
-from .tasks import calculate_quiz_score
+
 
 
 CONTENT= 'content'
@@ -157,7 +157,6 @@ class QuizAttempt(models.Model):
             self.completed = True
             self.end_time = timezone.now()
             self.save()
-            calculate_quiz_score.delay(self.id)  # Use the task here
 
     def all_essays_graded(self):
         essay_questions = self.quiz.questions.filter(question_type='essay')
@@ -183,12 +182,3 @@ class EssayGrade(models.Model):
 
     def __str__(self):
         return f"Essay grade for {self.quiz_attempt.quiz.title} - Question {self.question.text}"
-from django.db import transaction
-
-@receiver(post_save, sender=EssayGrade)
-def recalculate_quiz_score_on_essay_grade_update(sender, instance, **kwargs):
-    if not kwargs.get('created') and instance.score is not None:
-        with transaction.atomic():
-            instance.quiz_attempt.score_calculated = False
-            instance.quiz_attempt.save(update_fields=['score_calculated'])
-            calculate_quiz_score.delay(instance.quiz_attempt.id)
