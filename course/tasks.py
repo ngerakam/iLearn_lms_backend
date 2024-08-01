@@ -23,7 +23,7 @@ def send_course_enrollment_email(user_id,course_id):
     contacts = get_site_contacts()
     course = Course.objects.get(id=course_id)
     template_name = 'course/course_registration_email.html'
-    subject = 'Congratulations on Enrolling to our course!'
+    subject = f"Congratulations on Enrolling to our course {course.title} !"
 
     context = {
         'user': user,
@@ -41,7 +41,7 @@ def send_course_completion_email(user_id,course_id):
     contacts = get_site_contacts()
     course = Course.objects.get(id=course_id)
     template_name = 'course/course_completion_email.html'
-    subject = 'Congratulations on Enrolling to our course!'
+    subject = f"Congratulations on Completing the Course {course.title}!"
 
     context = {
         'user': user,
