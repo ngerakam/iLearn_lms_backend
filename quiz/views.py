@@ -16,7 +16,7 @@ from .models import (Quiz, Question, MultipleChoiceQuestion,
                       MultipleChoiceQuestionsOptions,
                       TrueFalseQuestion, EssayQuestion,
                         EssayQuestionAnswer, QuizAttempt, EssayGrade)
-from .utils import check_answers, extract_quiz_info
+from .utils import check_answers, extract_quiz_info, extract_question_data
 from .tasks import calculate_quiz_score
 from course.models import Course
 
@@ -445,30 +445,57 @@ class QuizSessionView(APIView):
         data = request.data
         obj = extract_quiz_info(data)
         quiz_id = obj['quiz_id']
-        user_answers = obj['user_answers']
+        up_user_answers = obj['user_answers']
         quiz = Quiz.objects.get(id=quiz_id)
         end_time = timezone.now()
-        quiz_attempt, created = QuizAttempt.objects.get_or_create(user=user, quiz=quiz)
+        quiz_attempt = QuizAttempt.objects.get(user=user,quiz=quiz)
+        question_answers = obj['question_answers']
+        user_answers = extract_question_data(question_answers)
+        # print(user_answers)
 
-        # Save or update essay answers
-        for question_id, answer in user_answers.items():
-            if isinstance(answer, dict) and 'answer' in answer:  # Assuming essay answers are in a dict format
-                essay_question = EssayQuestion.objects.get(id=int(question_id))
-                EssayQuestionAnswer.objects.update_or_create(
-                    created_by=user,
-                    essay_question=essay_question,
-                    defaults={'text': answer['answer'], 'is_correct': False}
+        for item in user_answers:
+            question = Question.objects.get(id=item["question__pk"], question_type=item["question_type"])
+            if question.question_type == 'essay':
+                answer = item['answer']
+                essay_q = EssayQuestion.objects.get(question=question)
+                essay_q_answer, created = EssayQuestionAnswer.objects.get_or_create(
+                    essay_question=essay_q,
+                    defaults={
+                        'text': answer,
+                        'is_correct': False,
+                        'created_by': user
+                    }
                 )
-
+                if not created:
+                    # Update existing answer if needed
+                    essay_q_answer.text = answer
+                essay_q_answer.save()
+                quiz_attempt = QuizAttempt.objects.get(user=user, quiz=quiz)
+                essay_grade, created = EssayGrade.objects.get_or_create(
+                    quiz_attempt=quiz_attempt,
+                    question=question,
+                    defaults={
+                        'student':user,
+                        'answer':essay_q_answer.text
+                    }
+                )
+                if not created:
+                    essay_grade.answer = essay_q_answer.text
+                essay_grade.save()
+            else:
+                pass
         # Update the answers
-        quiz_attempt.answers.update(user_answers)
-        quiz_attempt.save()
+        print("####################### updating quiz attempt ###############")
+        # quiz_attempt.answers.update(up_user_answers)
+        # quiz_attempt.save()
+        print(f"############# quiz_attempt: {quiz_attempt} ##################")
 
         # Mark the attempt as complete and set the end time
         if not quiz_attempt.completed:
-            quiz_attempt.end_time = end_time
+            quiz_attempt.end_time = timezone.now()
             quiz_attempt.completed = True
             quiz_attempt.save()
+            print("####################### caculated ###############")
             calculate_quiz_score.delay(quiz_attempt.id)
 
         return Response({

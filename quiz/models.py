@@ -109,8 +109,8 @@ class EssayQuestion(models.Model):
 class EssayQuestionAnswer(models.Model):
     essay_question = models.ForeignKey(EssayQuestion, related_name='essay_answers',
                                         on_delete=models.CASCADE)
-    is_correct = models.BooleanField()
-    text = models.TextField()
+    is_correct = models.BooleanField(default=False)
+    text = models.TextField(blank=True, null=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL,
                                     related_name='essay_answers', on_delete=models.CASCADE)
     class Meta:
@@ -165,22 +165,24 @@ class QuizAttempt(models.Model):
         return essay_questions.count() == graded_essays.count()
 
     def __str__(self):
-        return f"{self.user.username}'s attempt on {self.quiz.title}"
+        return f"User: {self.user.email}'s attempt on {self.quiz.title}"
 
 class EssayGrade(models.Model):
     quiz_attempt = models.ForeignKey('QuizAttempt', on_delete=models.CASCADE, related_name='essay_grades')
     question = models.ForeignKey('Question', on_delete=models.CASCADE)
+    answer = models.TextField(blank=True, null=True)
     grader = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='essay_grader')
     student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='essay_student')
     score = models.IntegerField(null=True, blank=True)
     feedback = models.TextField(blank=True)
+    is_correct = models.BooleanField(default=False)
     graded_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ('quiz_attempt', 'question')
 
     def __str__(self):
-        return f"Essay grade for {self.quiz_attempt} - Question {self.question.id}"
+        return f"Essay grade for {self.quiz_attempt.quiz.title} - Question {self.question.text}"
 
 # Signal to update graded_at when grader is updated and recalculate score
 @receiver(post_save, sender=EssayGrade)

@@ -1,3 +1,25 @@
+import json
+
+def extract_question_data(data):
+    """
+    Extract question__pk and answer from the given data structure.
+    
+    Args:
+    data (list): A list of dictionaries containing question data.
+    
+    Returns:
+    list: A list of dictionaries with 'question__pk' and 'answer' keys.
+    """
+    extracted_data = [
+        {
+            "question__pk": item["questionId"],
+            "answer": item["answer"]["answer"],
+            "question_type": item["answer"]["question_type"]
+        }
+        for item in data
+    ]
+    return extracted_data
+
 def extract_quiz_info(data):
     quiz_id = data.get('quiz')
     user_answers = data.get('user_answers', {})
