@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework import status
+from celery.result import AsyncResult
 from .serializers import (QuizSerializer, QuestionSerializer,
                            MultipleChoiceQuestionSerializer,
                              MultipleChoiceQuestionsOptionsSerializer,
@@ -501,13 +502,15 @@ class QuizSessionView(APIView):
             quiz_attempt.save()
             print("####################### caculated ###############")
             try:
-                results = calculate_quiz_score.delay(quiz_attempt.id)
+                task_id = calculate_quiz_score.delay(quiz_attempt_id)
+                result = AsyncResult(task_id).result
                 print(f"############# results: {results} ##################")
             except Exception as e:
                 print(f"Error calculating quiz score: {str(e)}")
         else:
             try:
-                results = calculate_quiz_score.delay(quiz_attempt.id)
+                task_id = calculate_quiz_score.delay(quiz_attempt_id)
+                result = AsyncResult(task_id).result
                 print(f"############# results: {results} ##################")
             except Exception as e:
                 print(f"Error calculating quiz score: {str(e)}")
