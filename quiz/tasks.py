@@ -44,12 +44,30 @@ def run_calculate_quiz_score(attempt_id):
 
         try:
             if question.question_type == 'multi-choice':
+                # Get the multiple choice question object
                 multiple_choice_question = question.multiple_choice_question
-                correct_options = multiple_choice_question.options.filter(correct_option=True)
-                correct_option_ids = [option.id for option in correct_options]
-                user_answer_ids = answer['answer']
-                if set(user_answer_ids) == set(correct_option_ids):
-                    user_marks += question.marks
+                
+                # Check if the question allows multiple answers
+                if multiple_choice_question.is_many_answers:
+                    # Get the correct options
+                    correct_options = multiple_choice_question.options.filter(correct_option=True)
+                    
+                    # Get the user's selected options that are correct
+                    user_answer_options = [option for option in correct_options if option.option in answer['answer']]
+                    
+                    # Calculate the score based on the number of correct options
+                    correct_count = len(correct_options)
+                    user_correct_count = len(user_answer_options)
+                    if correct_count > 0:
+                        question_score = (user_correct_count / correct_count) * question.marks
+                        user_marks += question_score
+                else:
+                    # Get the single correct option
+                    correct_option = multiple_choice_question.options.filter(correct_option=True).first()
+                    
+                    # Check if the user's answer matches the correct option
+                    if correct_option.option == answer['answer']:
+                        user_marks += question.marks
             elif question.question_type == 'true-false':
                 true_false_question = question.true_false_question
                 if answer['answer'] == true_false_question.correct_answer:
