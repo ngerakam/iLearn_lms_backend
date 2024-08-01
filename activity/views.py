@@ -13,6 +13,8 @@ from .models import (CourseActivity,ModuleActivity,LessonActivity,
 from .serializers import (CourseActivitySerializer, ModuleActivitySerializer,
                           LessonActivitySerializer, ActivityLogSerializer)
 
+from course.tasks import send_course_completion_email
+
 from course.models import (Course, Module, Lesson, Enrollment)
 
 from course.serializers import (CourseSerializer, CourseStatusSerializer)
@@ -168,11 +170,11 @@ class CourseActivityAPIView(APIView):
     def get(self, request, course_slug):
         try:
             course = Course.objects.get(slug=course_slug)
-            print("Course ",course)
+            # print("Course ",course)
             activity = CourseActivity.objects.get(
                 activity_course_id=course.id,
                 created_by_id=request.user.id)
-            print("Activity ",activity)
+            # print("Activity ",activity)
             serializer = CourseActivitySerializer(activity, many=False)
             return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         except CourseActivity.DoesNotExist:
@@ -184,7 +186,7 @@ class CourseActivityAPIView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def put(self, request, course_slug):
-        print(request.data)
+        # print(request.data)
         try:
             course = Course.objects.get(slug=course_slug)
             activity = CourseActivity.objects.get(
@@ -192,6 +194,7 @@ class CourseActivityAPIView(APIView):
                 created_by_id=request.user.id)
             activity.status=request.data.get('status')
             activity.save()
+            send_course_completion_email(request.user.id, course.id)
             serializer = CourseActivitySerializer(activity, many=False)
             return Response({"data":serializer.data}, status=status.HTTP_200_OK)
         except CourseActivity.DoesNotExist:

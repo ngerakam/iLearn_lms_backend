@@ -33,3 +33,21 @@ def send_course_enrollment_email(user_id,course_id):
     }
 
     send_html_email(subject, [user.email], template_name, context)
+
+@shared_task
+def send_course_completion_email(user_id,course_id):
+    user = User.objects.get(id=user_id)
+    allowed_origin = settings.CORS_ALLOWED_ORIGINS[0]
+    contacts = get_site_contacts()
+    course = Course.objects.get(id=course_id)
+    template_name = 'course/course_completion_email.html'
+    subject = 'Congratulations on Enrolling to our course!'
+
+    context = {
+        'user': user,
+        'url': allowed_origin,
+        'contacts': contacts,
+        'course': course
+    }
+
+    send_html_email(subject, [user.email], template_name, context)
