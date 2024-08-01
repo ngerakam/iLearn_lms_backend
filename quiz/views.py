@@ -452,12 +452,12 @@ class QuizSessionView(APIView):
 
         # Save or update essay answers
         for question_id, answer in user_answers.items():
-            if isinstance(answer, dict) and 'text' in answer:  # Assuming essay answers are in a dict format
+            if isinstance(answer, dict) and 'answer' in answer:  # Assuming essay answers are in a dict format
                 essay_question = EssayQuestion.objects.get(id=int(question_id))
                 EssayQuestionAnswer.objects.update_or_create(
                     created_by=user,
                     essay_question=essay_question,
-                    defaults={'text': answer['text'], 'is_correct': False}
+                    defaults={'text': answer['answer'], 'is_correct': False}
                 )
 
         # Update the answers
