@@ -2,6 +2,8 @@
 
 This file is for changing of superuser's password via the terminal
 
+Usage : python change_password.py <email> <new_password>
+
 """
 
 import os
