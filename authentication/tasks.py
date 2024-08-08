@@ -52,6 +52,8 @@ def send_user_registration_email(user_id):
         'password': password
     }
 
+    if user.is_superuser:
+        userprofile = UserProfile.objects.get_or_create(user=user)
     # Use the send_html_email utility to send the email
     send_html_email(subject, [user.email], template_name, context)
 
@@ -60,5 +62,3 @@ def send_user_registration_email(user_id):
     user.save(update_fields=['password'])
 
     #for the manager python manage.py createsuperuser
-    if user.is_superuser:
-        userprofile = UserProfile.objects.get_or_create(user=user)
